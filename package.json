@@ -1,0 +1,20 @@
+{
+  "name": "voucher-tracker-v2",
+  "version": "2.0.0",
+  "private": true,
+  "scripts": {
+    "setup":        "node scripts/setup.js",
+    "dev":          "concurrently --names \"API,UI\" --prefix-colors \"green,blue\" \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend":  "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "db:push":      "npm --prefix backend run db:push",
+    "db:migrate":   "npm --prefix backend run db:migrate",
+    "db:seed":      "npm --prefix backend run db:seed",
+    "db:studio":    "npm --prefix backend run db:studio",
+    "build":        "npm --prefix frontend run build",
+    "start":        "NODE_ENV=production npm --prefix backend run start"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

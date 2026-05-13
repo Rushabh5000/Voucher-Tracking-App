@@ -1,0 +1,43 @@
+erDiagram
+
+    Voucher {
+        String  id                  PK  "UUID"
+        String  title
+        String  voucherCode         UK  "unique"
+        String  brand
+        String  sourceProgramOrCard
+        String  description
+        String  voucherType
+        Float   value               "nullable"
+        DateTime expiryDate         "nullable"
+        DateTime issueDate
+        DateTime dateAdded
+        Enum    status              "UNREDEEMED|REDEEMED|EXPIRED"
+        DateTime redeemedAt         "nullable"
+        String  emailId
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    Card {
+        String  id           PK  "UUID"
+        String  accountOwner
+        String  cardName
+        String  bank
+        String  email
+        String  mobileNumber
+        String  notes
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    AutocompleteEntry {
+        String  id        PK  "UUID"
+        String  field         "e.g. bank, brand, email"
+        String  value
+        Int     count         "usage frequency"
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    AutocompleteEntry ||--o{ AutocompleteEntry : "field+value unique"

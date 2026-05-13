@@ -1,0 +1,77 @@
+// Prisma schema for Voucher Tracker v2
+// Database: PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum VoucherStatus {
+  UNREDEEMED
+  REDEEMED
+  EXPIRED
+}
+
+model Voucher {
+  id                  String        @id @default(uuid())
+  title               String        @default("")
+  voucherCode         String        @unique
+  brand               String        @default("Uncategorized")
+  sourceProgramOrCard String        @default("")
+  description         String        @default("")
+  voucherType         String        @default("")
+  value               Float?
+  expiryDate          DateTime?
+  issueDate           DateTime      @default(now())
+  dateAdded           DateTime      @default(now())
+  status              VoucherStatus @default(UNREDEEMED)
+  redeemedAt          DateTime?
+  emailId             String        @default("")
+  cardOwner           String        @default("")
+  cardName            String        @default("")
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  @@index([dateAdded])
+  @@index([status])
+  @@index([brand])
+}
+
+model Card {
+  id              String   @id @default(uuid())
+  accountOwner    String
+  cardName        String
+  bank            String
+  lastFourDigits  String
+  email           String   @default("")
+  mobileNumber    String   @default("")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([bank])
+  @@index([accountOwner])
+}
+
+// Stores unique values per field for smart autocomplete
+model AutocompleteEntry {
+  id        String   @id @default(uuid())
+  field     String
+  value     String
+  count     Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([field, value])
+  @@index([field])
+}
+
+// Persists app-level key-value settings (e.g. last email sent timestamp)
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
