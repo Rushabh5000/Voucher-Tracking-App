@@ -5,11 +5,6 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("🌱 Seeding database…");
 
-  // ─── Clear existing data ───────────────────────────────
-  await prisma.autocompleteEntry.deleteMany();
-  await prisma.card.deleteMany();
-  await prisma.voucher.deleteMany();
-
   // ─── Cards ─────────────────────────────────────────────
   const cards = await prisma.card.createMany({
     data: [
