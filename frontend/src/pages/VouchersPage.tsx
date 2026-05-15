@@ -5,9 +5,10 @@ import { VoucherCard } from "@/components/vouchers/VoucherCard";
 interface VouchersPageProps {
   onAdd: () => void;
   onGetVoucher: () => void;
+  onEdit: (id: string) => void;
 }
 
-export function VouchersPage({ onAdd, onGetVoucher }: VouchersPageProps) {
+export function VouchersPage({ onAdd, onGetVoucher, onEdit }: VouchersPageProps) {
   const { vouchers, brands } = useVoucherStore();
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [brandFilter,  setBrandFilter]  = useState("ALL");
@@ -52,6 +53,7 @@ export function VouchersPage({ onAdd, onGetVoucher }: VouchersPageProps) {
           placeholder="Search code, title, brand, source…"
           value={query}
           onChange={e => setQuery(e.target.value)}
+          autoComplete="off"
         />
 
         {(statusFilter !== "ALL" || brandFilter !== "ALL" || query) && (
@@ -84,7 +86,7 @@ export function VouchersPage({ onAdd, onGetVoucher }: VouchersPageProps) {
         </div>
       ) : (
         <div className="space-y-3">
-          {filtered.map(v => <VoucherCard key={v.id} voucher={v} />)}
+          {filtered.map(v => <VoucherCard key={v.id} voucher={v} onEdit={onEdit} />)}
         </div>
       )}
     </div>

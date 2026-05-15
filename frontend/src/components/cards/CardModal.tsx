@@ -14,6 +14,7 @@ const blank: CardFormData = {
   accountOwner: "",
   cardName: "",
   bank: "",
+  cardType: "",
   lastFourDigits: "",
   email: "",
   mobileNumber: "",
@@ -33,6 +34,7 @@ export function CardModal({ open, onClose, existing }: CardModalProps) {
               accountOwner:   existing.accountOwner,
               cardName:       existing.cardName,
               bank:           existing.bank,
+              cardType:       existing.cardType ?? "",
               lastFourDigits: existing.lastFourDigits,
               email:          existing.email,
               mobileNumber:   existing.mobileNumber,
@@ -52,9 +54,18 @@ export function CardModal({ open, onClose, existing }: CardModalProps) {
     if (!form.accountOwner.trim())   { setError("Account owner is required."); return; }
     if (!form.cardName.trim())       { setError("Card name is required."); return; }
     if (!form.bank.trim())           { setError("Bank is required."); return; }
+    if (!form.cardType.trim())       { setError("Card type is required."); return; }
     if (!form.lastFourDigits.trim()) { setError("Last 4 digits are required."); return; }
     if (!/^\d{4}$/.test(form.lastFourDigits.trim())) {
       setError("Last 4 digits must be exactly 4 numeric digits."); return;
+    }
+    if (!form.email.trim()) { setError("Email is required."); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      setError("Enter a valid email address."); return;
+    }
+    if (!form.mobileNumber.trim()) { setError("Mobile number is required."); return; }
+    if (!/^\d{1,10}$/.test(form.mobileNumber.trim())) {
+      setError("Mobile number must be up to 10 digits only."); return;
     }
 
     setSaving(true);
@@ -105,6 +116,16 @@ export function CardModal({ open, onClose, existing }: CardModalProps) {
           />
         </div>
 
+        {/* Row 1b: Card type */}
+        <SmartInput
+          field="cardType"
+          value={form.cardType}
+          onChange={upd("cardType")}
+          label="Card type"
+          placeholder="e.g. Rupay Select, Visa Infinite"
+          required
+        />
+
         {/* Row 2: Card name + Last 4 digits */}
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -116,6 +137,7 @@ export function CardModal({ open, onClose, existing }: CardModalProps) {
               value={form.cardName}
               onChange={updE("cardName")}
               placeholder="e.g. HDFC Millennia"
+              autoComplete="off"
             />
           </div>
           <div>
@@ -130,6 +152,7 @@ export function CardModal({ open, onClose, existing }: CardModalProps) {
               maxLength={4}
               inputMode="numeric"
               pattern="\d{4}"
+              autoComplete="off"
             />
           </div>
         </div>
@@ -143,6 +166,7 @@ export function CardModal({ open, onClose, existing }: CardModalProps) {
             label="Email"
             placeholder="your@email.com"
             type="email"
+            required
           />
           <SmartInput
             field="mobileNumber"
@@ -151,6 +175,7 @@ export function CardModal({ open, onClose, existing }: CardModalProps) {
             label="Mobile number"
             placeholder="9876543210"
             type="tel"
+            required
           />
         </div>
 

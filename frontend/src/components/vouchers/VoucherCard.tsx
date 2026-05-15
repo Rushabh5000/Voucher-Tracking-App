@@ -7,9 +7,10 @@ import { useState } from "react";
 interface VoucherCardProps {
   voucher: Voucher;
   onView?: (id: string) => void;
+  onEdit?: (id: string) => void;
 }
 
-export function VoucherCard({ voucher, onView }: VoucherCardProps) {
+export function VoucherCard({ voucher, onView, onEdit }: VoucherCardProps) {
   const { redeemVoucher, unredeemVoucher, deleteVoucher } = useVoucherStore();
   const [confirmDel, setConfirmDel] = useState(false);
 
@@ -71,6 +72,11 @@ export function VoucherCard({ voucher, onView }: VoucherCardProps) {
           {onView && (
             <button className="btn-secondary text-xs px-3 py-1.5" onClick={() => onView(voucher.id)}>
               Details
+            </button>
+          )}
+          {onEdit && (
+            <button className="btn-secondary text-xs px-3 py-1.5" onClick={() => onEdit(voucher.id)}>
+              Edit
             </button>
           )}
           {voucher.status === "UNREDEEMED" && (

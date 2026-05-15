@@ -46,6 +46,7 @@ model Card {
   accountOwner    String
   cardName        String
   bank            String
+  cardType        String   @default("Rupay Select")
   lastFourDigits  String
   email           String   @default("")
   mobileNumber    String   @default("")
@@ -74,4 +75,23 @@ model AppSetting {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+// Records every mutating DB operation for auditing
+model AuditLog {
+  id         String   @id @default(uuid())
+  action     String   // Human-readable: "Created voucher", "Deleted card"
+  entity     String   // Model name: "Voucher", "Card", "AutocompleteEntry"
+  entityId   String?  // UUID of the affected record
+  details    String?  // e.g. "Amazon | AMZN-HDFC-Q1-2025"
+  method     String
+  path       String
+  statusCode Int
+  durationMs Int
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([entity])
 }

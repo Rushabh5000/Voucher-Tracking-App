@@ -5,12 +5,14 @@ import { useVoucherStore } from "@/store/voucherStore";
 import { useCardStore }   from "@/store/cardStore";
 import { Layout }         from "@/components/layout/Layout";
 import { AddVoucherModal }  from "@/components/vouchers/AddVoucherModal";
+import { EditVoucherModal } from "@/components/vouchers/EditVoucherModal";
 import { GetVoucherModal }  from "@/components/vouchers/GetVoucherModal";
 import { DashboardPage }  from "@/pages/DashboardPage";
 import { VouchersPage }   from "@/pages/VouchersPage";
 import { CardsPage }      from "@/pages/CardsPage";
 import { AnalyticsPage }  from "@/pages/AnalyticsPage";
 import { ExportPage }     from "@/pages/ExportPage";
+import { AuditPage }     from "@/pages/AuditPage";
 import { SettingsPage }   from "@/pages/SettingsPage";
 import { useState }       from "react";
 
@@ -20,6 +22,7 @@ const PAGE_TITLES: Record<string, { title: string; subtitle?: string }> = {
   cards:     { title: "Cards", subtitle: "Manage your credit and debit cards" },
   analytics: { title: "Analytics", subtitle: "Charts and trends" },
   export:    { title: "Export", subtitle: "Excel, PDF, and email reports" },
+  audit:     { title: "Audit Log", subtitle: "Every API call, recorded" },
   settings:  { title: "Settings" },
 };
 
@@ -30,6 +33,8 @@ export default function App() {
 
   const [addOpen, setAddOpen] = useState(false);
   const [getOpen, setGetOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingVoucherId, setEditingVoucherId] = useState<string>("");
 
   // Apply saved theme on mount
   useEffect(() => {
@@ -62,15 +67,17 @@ export default function App() {
   return (
     <>
       <Layout title={meta.title} subtitle={meta.subtitle} actions={pageActions}>
-        {activePage === "dashboard" && <DashboardPage onAddVoucher={() => setAddOpen(true)} onGetVoucher={() => setGetOpen(true)} />}
-        {activePage === "vouchers"  && <VouchersPage  onAdd={() => setAddOpen(true)} onGetVoucher={() => setGetOpen(true)} />}
+        {activePage === "dashboard" && <DashboardPage onAddVoucher={() => setAddOpen(true)} onGetVoucher={() => setGetOpen(true)} onEditVoucher={(id) => { setEditingVoucherId(id); setEditOpen(true); }} />}
+        {activePage === "vouchers"  && <VouchersPage  onAdd={() => setAddOpen(true)} onGetVoucher={() => setGetOpen(true)} onEdit={(id) => { setEditingVoucherId(id); setEditOpen(true); }} />}
         {activePage === "cards"     && <CardsPage />}
         {activePage === "analytics" && <AnalyticsPage />}
         {activePage === "export"    && <ExportPage />}
+        {activePage === "audit"     && <AuditPage />}
         {activePage === "settings"  && <SettingsPage />}
       </Layout>
 
       <AddVoucherModal open={addOpen} onClose={() => setAddOpen(false)} />
+      <EditVoucherModal open={editOpen} onClose={() => { setEditOpen(false); setEditingVoucherId(""); }} voucherId={editingVoucherId} />
       <GetVoucherModal open={getOpen} onClose={() => setGetOpen(false)} />
 
       <Toaster

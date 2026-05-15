@@ -1,10 +1,11 @@
 import { useUIStore } from "@/store/uiStore";
+import { FieldValuesManager } from "@/components/settings/FieldValuesManager";
 
 export function SettingsPage() {
   const { theme, setTheme } = useUIStore();
 
   return (
-    <div className="max-w-lg space-y-6">
+    <div className="max-w-2xl space-y-6">
       {/* Appearance */}
       <div className="card p-5">
         <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-4">Appearance</h3>
@@ -29,6 +30,9 @@ export function SettingsPage() {
           </div>
         </div>
       </div>
+
+      {/* Field Values Manager */}
+      <FieldValuesManager />
 
       {/* About */}
       <div className="card p-5">

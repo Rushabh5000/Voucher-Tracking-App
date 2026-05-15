@@ -4,19 +4,22 @@ import { SmartInput } from "@/components/ui/SmartInput";
 import { useVoucherStore } from "@/store/voucherStore";
 import { CardSelectInput } from "./CardSelectInput";
 import { useCardStore } from "@/store/cardStore";
-import type { Card } from "@/types";
+import type { Card, Voucher } from "@/types";
 
-interface AddVoucherModalProps {
+interface EditVoucherModalProps {
   open: boolean;
   onClose: () => void;
+  voucherId?: string;
 }
 
-// Returns today's date as YYYY-MM-DD
-function today(): string {
-  return new Date().toISOString().split("T")[0];
+function toDateStr(date: string | Date | null | undefined): string {
+  if (!date) return "";
+  if (typeof date === "string") {
+    return date.split("T")[0];
+  }
+  return new Date(date).toISOString().split("T")[0];
 }
 
-// Returns date +1 month from given YYYY-MM-DD string
 function plusOneMonth(dateStr: string): string {
   if (!dateStr) return "";
   const d = new Date(dateStr);
@@ -28,55 +31,61 @@ interface FormState {
   voucherCode: string;
   brand: string;
   title: string;
-  sourceProgramOrCard: string;   // the display label "CardName ending XXXX"
-  sourceCardId: string;          // internal ID of selected card
+  sourceProgramOrCard: string;
+  sourceCardId: string;
   description: string;
   issueDate: string;
   expiryDate: string;
   hasExpiry: boolean;
-  // disabled / auto-filled from card
   emailId: string;
   cardOwner: string;
   cardName: string;
 }
 
-function blankForm(): FormState {
-  const issueDateStr = today();
+function voucherToForm(v: Voucher, cards: Card[]): FormState {
+  // Try to find matching card by sourceProgramOrCard
+  const matchedCard = cards.find(
+    (c) => `${c.bank} | ${c.lastFourDigits}` === v.sourceProgramOrCard
+  );
   return {
-    voucherCode:        "",
-    brand:              "",
-    title:              "",
-    sourceProgramOrCard: "",
-    sourceCardId:       "",
-    description:        "",
-    issueDate:          issueDateStr,
-    expiryDate:         plusOneMonth(issueDateStr),
-    hasExpiry:          true,
-    emailId:            "",
-    cardOwner:          "",
-    cardName:           "",
+    voucherCode:        v.voucherCode,
+    brand:              v.brand,
+    title:              v.title,
+    sourceProgramOrCard: v.sourceProgramOrCard,
+    sourceCardId:       matchedCard?.id || "",
+    description:        v.description,
+    issueDate:          toDateStr(v.issueDate),
+    expiryDate:         toDateStr(v.expiryDate),
+    hasExpiry:          !!v.expiryDate,
+    emailId:            v.emailId,
+    cardOwner:          v.cardOwner,
+    cardName:           v.cardName,
   };
 }
 
-// Helper: format a card as "CardName ending XXXX"
 function cardLabel(card: Card): string {
   return `${card.bank} | ${card.lastFourDigits}`;
 }
 
-export function AddVoucherModal({ open, onClose }: AddVoucherModalProps) {
-  const { addVoucher, vouchers } = useVoucherStore();
+export function EditVoucherModal({ open, onClose, voucherId }: EditVoucherModalProps) {
+  const { vouchers, updateVoucher } = useVoucherStore();
   const { cards } = useCardStore();
 
-  const [form,   setForm]   = useState<FormState>(blankForm);
+  const [form, setForm] = useState<FormState>({ voucherCode: "", brand: "", title: "", sourceProgramOrCard: "", sourceCardId: "", description: "", issueDate: "", expiryDate: "", hasExpiry: false, emailId: "", cardOwner: "", cardName: "" });
   const [saving, setSaving] = useState(false);
-  const [error,  setError]  = useState("");
+  const [error, setError] = useState("");
 
-  // Reset on open
+  const voucher = voucherId ? vouchers.find((v) => v.id === voucherId) : null;
+
+  // Initialize form when modal opens
   useEffect(() => {
-    if (open) { setForm(blankForm()); setError(""); }
-  }, [open]);
+    if (open && voucher) {
+      setForm(voucherToForm(voucher, cards));
+      setError("");
+    }
+  }, [open, voucher, cards]);
 
-  // When sourceCardId changes, auto-fill disabled fields from the matching card
+  // When sourceCardId changes, auto-fill disabled fields
   const applyCardFields = useCallback((cardId: string) => {
     const card = cards.find((c) => c.id === cardId);
     if (!card) {
@@ -93,11 +102,10 @@ export function AddVoucherModal({ open, onClose }: AddVoucherModalProps) {
     }));
   }, [cards]);
 
-  // When issue date changes, auto-update expiry to +1 month (if hasExpiry and user hasn't manually edited)
   function handleIssueDateChange(val: string) {
     setForm((f) => ({
       ...f,
-      issueDate:  val,
+      issueDate: val,
       expiryDate: f.hasExpiry ? plusOneMonth(val) : f.expiryDate,
     }));
   }
@@ -114,31 +122,17 @@ export function AddVoucherModal({ open, onClose }: AddVoucherModalProps) {
     }));
   }
 
-  const upd  = (k: keyof FormState) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
+  const upd = (k: keyof FormState) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
   const updE = (k: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
 
-  function handleVoucherCodeBlur() {
-    if (!form.voucherCode.trim()) return;
-    if (vouchers.some((v) => v.voucherCode.toLowerCase() === form.voucherCode.trim().toLowerCase())) {
-      setError("A voucher with this code already exists.");
-    } else {
-      setError("");
-    }
-  }
-
   async function handleSubmit() {
-    if (!form.voucherCode.trim()) { setError("Voucher code is required."); return; }
-    if (!form.brand.trim())       { setError("Brand is required."); return; }
-    if (vouchers.some((v) => v.voucherCode.toLowerCase() === form.voucherCode.trim().toLowerCase())) {
-      setError("A voucher with this code already exists."); return;
-    }
     setError("");
+    if (!form.brand.trim()) { setError("Brand is required."); return; }
 
     setSaving(true);
     try {
-      await addVoucher({
-        voucherCode:         form.voucherCode.trim(),
+      await updateVoucher(voucherId || "", {
         brand:               form.brand.trim(),
         title:               form.title.trim(),
         sourceProgramOrCard: form.sourceProgramOrCard.trim(),
@@ -157,29 +151,30 @@ export function AddVoucherModal({ open, onClose }: AddVoucherModalProps) {
     }
   }
 
-  // Disabled input style
   const disabledCls = "input bg-gray-50 dark:bg-gray-800/60 text-gray-400 dark:text-gray-500 cursor-not-allowed select-none";
+
+  if (!voucher) return null;
 
   return (
     <Modal
       open={open}
-      onClose={() => { setForm(blankForm()); onClose(); }}
-      title="Add voucher"
+      onClose={onClose}
+      title="Edit voucher"
       size="xl"
       footer={
         <>
-          <button className="btn-secondary" onClick={() => { setForm(blankForm()); onClose(); }}>
+          <button className="btn-secondary" onClick={onClose}>
             Cancel
           </button>
           <button className="btn-primary" onClick={handleSubmit} disabled={saving}>
-            {saving ? "Saving…" : "Save voucher"}
+            {saving ? "Saving…" : "Update voucher"}
           </button>
         </>
       }
     >
       <div className="space-y-5">
 
-        {/* ── Row 1: Brand (mandatory) + Voucher Code (mandatory) ── */}
+        {/* ── Row 1: Brand (mandatory) + Voucher Code (read-only) ── */}
         <div className="grid grid-cols-2 gap-4">
           <SmartInput
             field="brand"
@@ -191,15 +186,13 @@ export function AddVoucherModal({ open, onClose }: AddVoucherModalProps) {
           />
           <div>
             <label className="label">
-              Voucher code <span className="text-red-500">*</span>
+              Voucher code <span className="text-gray-400 text-xs font-normal">(cannot edit)</span>
             </label>
             <input
-              className="input font-mono"
+              className={disabledCls}
               value={form.voucherCode}
-              onChange={updE("voucherCode")}
-              onBlur={handleVoucherCodeBlur}
-              placeholder="e.g. AMZN-HDFC-Q1-2025"
-              autoComplete="off"
+              readOnly
+              tabIndex={-1}
             />
           </div>
         </div>
@@ -216,7 +209,7 @@ export function AddVoucherModal({ open, onClose }: AddVoucherModalProps) {
             contextValue={form.brand}
           />
 
-          {/* Source card — searchable combobox, only existing cards */}
+          {/* Source card */}
           <CardSelectInput
             cards={cards}
             selectedId={form.sourceCardId}

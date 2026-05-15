@@ -41,6 +41,7 @@ export interface Card {
   accountOwner: string;
   cardName: string;
   bank: string;
+  cardType: string;
   lastFourDigits: string;
   email: string;
   mobileNumber: string;
@@ -52,6 +53,7 @@ export interface CardFormData {
   accountOwner: string;
   cardName: string;
   bank: string;
+  cardType: string;
   lastFourDigits: string;
   email: string;
   mobileNumber: string;
@@ -79,10 +81,34 @@ export interface AnalyticsData {
   expiringIn30Days: number;
 }
 
+export interface AuditLog {
+  id:         string;
+  action:     string;
+  entity:     string;
+  entityId:   string | null;
+  details:    string | null;
+  method:     string;
+  path:       string;
+  statusCode: number;
+  durationMs: number;
+  ipAddress:  string | null;
+  userAgent:  string | null;
+  createdAt:  string;
+}
+
+export interface AuditListResponse {
+  data:  AuditLog[];
+  total: number;
+  page:  number;
+  limit: number;
+  pages: number;
+}
+
 export type Page =
   | "dashboard"
   | "vouchers"
   | "cards"
   | "analytics"
   | "export"
+  | "audit"
   | "settings";

@@ -91,7 +91,20 @@ export function CardSelectInput({ cards, selectedId, onSelect, label }: CardSele
       e.preventDefault(); handleSelect(opts[highlighted]);
     }
     if (e.key === "Escape") { setOpen(false); setQuery(""); }
-    if (e.key === "Tab")    { setOpen(false); }
+    if (e.key === "Tab") {
+      if (!selectedCard && opts.length > 0) {
+        const pick = highlighted >= 0 ? opts[highlighted] : opts[0];
+        handleSelect(pick);
+        // don't prevent default — focus moves naturally to next field
+      } else {
+        setOpen(false);
+      }
+    }
+  }
+
+  function handleBlur() {
+    setOpen(false);
+    if (!selectedCard) setQuery("");
   }
 
   const opts = filtered();
@@ -113,6 +126,7 @@ export function CardSelectInput({ cards, selectedId, onSelect, label }: CardSele
           value={displayValue}
           onChange={handleInput}
           onFocus={handleFocus}
+          onBlur={handleBlur}
           onKeyDown={handleKeyDown}
           placeholder={cards.length === 0 ? "No cards saved — add cards first" : "Type bank name or last 4 digits…"}
           disabled={cards.length === 0}

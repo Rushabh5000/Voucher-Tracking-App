@@ -14,26 +14,34 @@ type Step = "select-brand" | "show-voucher";
 export function GetVoucherModal({ open, onClose }: GetVoucherModalProps) {
   const { brands, getNext, redeemVoucher } = useVoucherStore();
 
-  const [step,     setStep]     = useState<Step>("select-brand");
-  const [brand,    setBrand]    = useState<string>("ALL");
-  const [voucher,  setVoucher]  = useState<Voucher | null | undefined>(undefined); // undefined=loading, null=none
-  const [loading,  setLoading]  = useState(false);
-  const [redeeming,setRedeeming] = useState(false);
+  const [step,      setStep]     = useState<Step>("select-brand");
+  const [brand,     setBrand]    = useState<string>("ALL");
+  const [voucher,   setVoucher]  = useState<Voucher | null | undefined>(undefined); // undefined=loading, null=none
+  const [skipped,   setSkipped]  = useState<string[]>([]);
+  const [loading,   setLoading]  = useState(false);
+  const [redeeming, setRedeeming] = useState(false);
 
   // Reset on open
   useEffect(() => {
-    if (open) { setStep("select-brand"); setBrand("ALL"); setVoucher(undefined); }
+    if (open) { setStep("select-brand"); setBrand("ALL"); setVoucher(undefined); setSkipped([]); }
   }, [open]);
 
-  async function fetchNext() {
+  async function fetchNext(exclude: string[] = []) {
     setLoading(true);
     try {
-      const v = await getNext(brand === "ALL" ? undefined : brand);
+      const v = await getNext(brand === "ALL" ? undefined : brand, exclude);
       setVoucher(v);
     } finally {
       setLoading(false);
       setStep("show-voucher");
     }
+  }
+
+  function handleNextVoucher() {
+    if (!voucher) return;
+    const nowSkipped = [...skipped, voucher.id];
+    setSkipped(nowSkipped);
+    fetchNext(nowSkipped);
   }
 
   async function handleRedeem() {
@@ -66,7 +74,10 @@ export function GetVoucherModal({ open, onClose }: GetVoucherModalProps) {
           </>
         ) : voucher ? (
           <>
-            <button className="btn-secondary" onClick={onClose}>Close — keep unredeemed</button>
+            <button className="btn-secondary" onClick={onClose}>Close</button>
+            <button className="btn-secondary" onClick={handleNextVoucher} disabled={loading}>
+              {loading ? "Fetching…" : "Next voucher →"}
+            </button>
             <button className="btn-primary" onClick={handleRedeem} disabled={redeeming}>
               {redeeming ? "Redeeming…" : "Redeem now"}
             </button>

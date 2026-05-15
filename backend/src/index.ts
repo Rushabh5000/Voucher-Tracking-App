@@ -2,12 +2,14 @@ import express from "express";
 import cors from "cors";
 import path from "path";
 
-import vouchersRouter    from "./routes/vouchers";
-import cardsRouter       from "./routes/cards";
+import vouchersRouter     from "./routes/vouchers";
+import cardsRouter        from "./routes/cards";
 import autocompleteRouter from "./routes/autocomplete";
-import reportsRouter     from "./routes/reports";
-import { errorHandler } from "./middleware/errorHandler";
+import reportsRouter      from "./routes/reports";
+import auditRouter        from "./routes/audit";
+import { errorHandler }   from "./middleware/errorHandler";
 import { startMonthlyReportJob } from "./jobs/monthlyReport";
+import { startBackupJobs }       from "./jobs/backup";
 
 const app  = express();
 const PORT = parseInt(process.env.PORT || "3001", 10);
@@ -31,6 +33,7 @@ if (process.env.NODE_ENV !== "production") {
 app.use("/api/vouchers",     vouchersRouter);
 app.use("/api/cards",        cardsRouter);
 app.use("/api/autocomplete", autocompleteRouter);
+app.use("/api/audit",        auditRouter);
 app.use("/api",              reportsRouter);   // /api/analytics, /api/export/*
 
 // Health check
@@ -55,6 +58,7 @@ app.listen(PORT, () => {
   console.log(`\n✅  Voucher Tracker API v2.0 running on http://localhost:${PORT}`);
   console.log(`    Health: http://localhost:${PORT}/api/health\n`);
   startMonthlyReportJob();
+  startBackupJobs().catch(err => console.error("[Backup] Job startup error:", err));
 });
 
 export default app;

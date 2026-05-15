@@ -10,10 +10,11 @@ interface VoucherState {
   // Actions
   load: () => Promise<void>;
   addVoucher: (data: Record<string, unknown>) => Promise<Voucher>;
+  updateVoucher: (id: string, data: Record<string, unknown>) => Promise<Voucher>;
   redeemVoucher: (id: string) => Promise<void>;
   unredeemVoucher: (id: string) => Promise<void>;
   deleteVoucher: (id: string) => Promise<void>;
-  getNext: (brand?: string) => Promise<Voucher | null>;
+  getNext: (brand?: string, exclude?: string[]) => Promise<Voucher | null>;
   // Derived
   brands: () => string[];
 }
@@ -44,6 +45,15 @@ export const useVoucherStore = create<VoucherState>()((set, get) => ({
     return v;
   },
 
+  updateVoucher: async (id: string, data: Record<string, unknown>) => {
+    const v = await voucherApi.update(id, data as any);
+    set((s) => ({
+      vouchers: s.vouchers.map((existing) => (existing.id === id ? v : existing)),
+    }));
+    toast.success(`Voucher "${v.brand}" updated!`);
+    return v;
+  },
+
   redeemVoucher: async (id) => {
     const updated = await voucherApi.redeem(id);
     set((s) => ({ vouchers: s.vouchers.map((v) => (v.id === id ? updated : v)) }));
@@ -62,8 +72,8 @@ export const useVoucherStore = create<VoucherState>()((set, get) => ({
     toast.success("Voucher deleted");
   },
 
-  getNext: async (brand) => {
-    return voucherApi.next(brand);
+  getNext: async (brand, exclude) => {
+    return voucherApi.next(brand, exclude);
   },
 
   brands: () => [...new Set(get().vouchers.map((v) => v.brand))].sort(),

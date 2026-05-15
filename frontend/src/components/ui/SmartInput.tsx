@@ -11,11 +11,13 @@ interface SmartInputProps {
   className?: string;
   type?: string;
   staticSuggestions?: string[];     // optional fixed suggestions (no API call)
+  contextField?: string;            // context field for filtering (e.g. "brand")
+  contextValue?: string;            // context value (e.g. "Amazon")
 }
 
 export function SmartInput({
   field, value, onChange, placeholder, label, required,
-  className, type = "text", staticSuggestions,
+  className, type = "text", staticSuggestions, contextField, contextValue,
 }: SmartInputProps) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
@@ -33,14 +35,14 @@ export function SmartInput({
           );
           setSuggestions(filtered);
         } else {
-          const results = await autocompleteApi.suggest(field, q || undefined);
+          const results = await autocompleteApi.suggest(field, q || undefined, contextField, contextValue);
           setSuggestions(results);
         }
       } catch {
         setSuggestions([]);
       }
     },
-    [field, staticSuggestions]
+    [field, staticSuggestions, contextField, contextValue]
   );
 
   useEffect(() => {
