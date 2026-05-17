@@ -2,7 +2,11 @@ import axios from "axios";
 import type { Voucher, Card, CardFormData, AnalyticsData, AuditListResponse } from "@/types";
 import { useAuthStore } from "@/store/authStore";
 
-const http = axios.create({ baseURL: "/api" });
+// In production (Vercel + Render) VITE_API_URL = "https://your-backend.onrender.com"
+// In local dev it's empty and Vite's proxy handles /api → localhost:3001
+const API_ORIGIN = (import.meta.env.VITE_API_URL as string) || "";
+
+const http = axios.create({ baseURL: `${API_ORIGIN}/api` });
 
 // Attach JWT to every request
 http.interceptors.request.use((config) => {
@@ -23,9 +27,10 @@ http.interceptors.response.use(
 // Append token to download href URLs so the browser can authenticate
 function authUrl(path: string): string {
   const token = useAuthStore.getState().token;
-  if (!token) return path;
-  const sep = path.includes("?") ? "&" : "?";
-  return `${path}${sep}token=${encodeURIComponent(token)}`;
+  const full  = `${API_ORIGIN}${path}`;
+  if (!token) return full;
+  const sep = full.includes("?") ? "&" : "?";
+  return `${full}${sep}token=${encodeURIComponent(token)}`;
 }
 
 // ─── Vouchers ─────────────────────────────────────────────────
