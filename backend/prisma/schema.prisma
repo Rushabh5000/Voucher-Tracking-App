@@ -18,11 +18,12 @@ enum VoucherStatus {
 
 model Voucher {
   id                  String        @id @default(uuid())
-  title               String        @default("")
-  voucherCode         String        @unique
-  brand               String        @default("Uncategorized")
-  sourceProgramOrCard String        @default("")
-  description         String        @default("")
+  title               String        @default("")   // encrypted
+  voucherCode         String                       // encrypted (was @unique — uniqueness now via voucherCodeHash)
+  voucherCodeHash     String?       @unique        // HMAC-SHA256 of normalised voucherCode for dedup
+  brand               String        @default("Uncategorized") // encrypted
+  sourceProgramOrCard String        @default("")   // encrypted
+  description         String        @default("")   // encrypted
   voucherType         String        @default("")
   value               Float?
   expiryDate          DateTime?
@@ -30,15 +31,14 @@ model Voucher {
   dateAdded           DateTime      @default(now())
   status              VoucherStatus @default(UNREDEEMED)
   redeemedAt          DateTime?
-  emailId             String        @default("")
-  cardOwner           String        @default("")
-  cardName            String        @default("")
+  emailId             String        @default("")   // encrypted
+  cardOwner           String        @default("")   // encrypted
+  cardName            String        @default("")   // encrypted
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
 
   @@index([dateAdded])
   @@index([status])
-  @@index([brand])
 }
 
 model Card {

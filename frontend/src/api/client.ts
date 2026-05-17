@@ -1,7 +1,32 @@
 import axios from "axios";
 import type { Voucher, Card, CardFormData, AnalyticsData, AuditListResponse } from "@/types";
+import { useAuthStore } from "@/store/authStore";
 
 const http = axios.create({ baseURL: "/api" });
+
+// Attach JWT to every request
+http.interceptors.request.use((config) => {
+  const token = useAuthStore.getState().token;
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+// On 401, clear the token so the app redirects to login
+http.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401) useAuthStore.getState().logout();
+    return Promise.reject(err);
+  }
+);
+
+// Append token to download href URLs so the browser can authenticate
+function authUrl(path: string): string {
+  const token = useAuthStore.getState().token;
+  if (!token) return path;
+  const sep = path.includes("?") ? "&" : "?";
+  return `${path}${sep}token=${encodeURIComponent(token)}`;
+}
 
 // ─── Vouchers ─────────────────────────────────────────────────
 export const voucherApi = {
@@ -54,14 +79,14 @@ export const auditApi = {
     const qs = new URLSearchParams(
       Object.fromEntries(Object.entries(params).filter(([, v]) => Boolean(v)))
     ).toString();
-    return `/api/audit/export${qs ? "?" + qs : ""}`;
+    return authUrl(`/api/audit/export${qs ? "?" + qs : ""}`);
   },
 };
 
 // ─── Export ───────────────────────────────────────────────────
 export const exportApi = {
-  excel:       () => `/api/export/excel`,
-  masterExcel: () => `/api/export/excel/master`,
-  pdf:         () => `/api/export/pdf`,
+  excel:       () => authUrl("/api/export/excel"),
+  masterExcel: () => authUrl("/api/export/excel/master"),
+  pdf:         () => authUrl("/api/export/pdf"),
   sendEmail:   () => http.post("/export/email"),
 };

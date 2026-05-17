@@ -2,9 +2,25 @@ import ExcelJS from "exceljs";
 import PDFDocument from "pdfkit";
 import { PrismaClient } from "@prisma/client";
 import { buildAnalytics } from "./analyticsService";
+import { decrypt } from "./encryptionService";
 import { Response } from "express";
 
 const prisma = new PrismaClient();
+
+const V_ENC = ["voucherCode", "brand", "title", "sourceProgramOrCard", "description", "emailId", "cardOwner", "cardName"] as const;
+const C_ENC = ["accountOwner", "lastFourDigits", "email", "mobileNumber"] as const;
+
+function decryptVoucher(v: any) {
+  const d = { ...v };
+  for (const f of V_ENC) if (d[f]) d[f] = decrypt(d[f]);
+  return d;
+}
+
+function decryptCard(c: any) {
+  const d = { ...c };
+  for (const f of C_ENC) if (d[f]) d[f] = decrypt(d[f]);
+  return d;
+}
 
 function fmtDate(d: Date | null | undefined): string {
   if (!d) return "—";
@@ -20,10 +36,11 @@ function effStatus(v: { status: string; expiryDate: Date | null }): string {
 // ─── Excel Export ─────────────────────────────────────────────────────────────
 
 export async function generateExcel(res: Response): Promise<void> {
-  const [vouchers, analytics] = await Promise.all([
+  const [rawVouchers, analytics] = await Promise.all([
     prisma.voucher.findMany({ orderBy: { dateAdded: "asc" } }),
     buildAnalytics(),
   ]);
+  const vouchers = rawVouchers.map(decryptVoucher);
 
   const wb = new ExcelJS.Workbook();
   wb.creator = "Voucher Tracker";
@@ -127,10 +144,11 @@ export async function generateExcel(res: Response): Promise<void> {
 // ─── PDF Export ───────────────────────────────────────────────────────────────
 
 export async function generatePDF(res: Response): Promise<void> {
-  const [vouchers, analytics] = await Promise.all([
+  const [rawVouchers, analytics] = await Promise.all([
     prisma.voucher.findMany({ orderBy: { dateAdded: "asc" } }),
     buildAnalytics(),
   ]);
+  const vouchers = rawVouchers.map(decryptVoucher);
 
   // Use landscape A4 so tables fit without wrapping
   const doc = new PDFDocument({ size: "A4", layout: "landscape", margin: 36, bufferPages: true });
@@ -330,11 +348,13 @@ export async function generatePDF(res: Response): Promise<void> {
 // ─── Master Excel Export — full DB dump ───────────────────────────────────────
 
 export async function generateMasterExcel(res: Response): Promise<void> {
-  const [vouchers, cards, analytics] = await Promise.all([
+  const [rawVouchers, rawCards, analytics] = await Promise.all([
     prisma.voucher.findMany({ orderBy: { dateAdded: "asc" } }),
     prisma.card.findMany({ orderBy: { bank: "asc" } }),
     buildAnalytics(),
   ]);
+  const vouchers = rawVouchers.map(decryptVoucher);
+  const cards    = rawCards.map(decryptCard);
 
   const autocompleteEntries = await prisma.autocompleteEntry.findMany({
     orderBy: [{ field: "asc" }, { count: "desc" }],
