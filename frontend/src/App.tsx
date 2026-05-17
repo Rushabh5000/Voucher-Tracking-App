@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Toaster } from "react-hot-toast";
 import { useUIStore }     from "@/store/uiStore";
+import { useAuthStore }   from "@/store/authStore";
 import { useVoucherStore } from "@/store/voucherStore";
 import { useCardStore }   from "@/store/cardStore";
 import { Layout }         from "@/components/layout/Layout";
@@ -12,9 +13,9 @@ import { VouchersPage }   from "@/pages/VouchersPage";
 import { CardsPage }      from "@/pages/CardsPage";
 import { AnalyticsPage }  from "@/pages/AnalyticsPage";
 import { ExportPage }     from "@/pages/ExportPage";
-import { AuditPage }     from "@/pages/AuditPage";
+import { AuditPage }      from "@/pages/AuditPage";
 import { SettingsPage }   from "@/pages/SettingsPage";
-import { WordCloudPage }  from "@/pages/WordCloudPage";
+import { LoginPage }      from "@/pages/LoginPage";
 import { useState }       from "react";
 
 const PAGE_TITLES: Record<string, { title: string; subtitle?: string }> = {
@@ -22,13 +23,13 @@ const PAGE_TITLES: Record<string, { title: string; subtitle?: string }> = {
   vouchers:  { title: "My vouchers", subtitle: "All claimed vouchers, oldest first" },
   cards:     { title: "Cards", subtitle: "Manage your credit and debit cards" },
   analytics: { title: "Analytics", subtitle: "Charts and trends" },
-  wordcloud: { title: "Brand Cloud", subtitle: "All brands — click one to explore its vouchers" },
   export:    { title: "Export", subtitle: "Excel, PDF, and email reports" },
   audit:     { title: "Audit Log", subtitle: "Every API call, recorded" },
   settings:  { title: "Settings" },
 };
 
 export default function App() {
+  const { token }      = useAuthStore();
   const { activePage } = useUIStore();
   const { load: loadVouchers } = useVoucherStore();
   const { load: loadCards }    = useCardStore();
@@ -49,15 +50,19 @@ export default function App() {
     }
   }, []);
 
+  // Load data whenever the token changes (covers: initial load after refresh + right after login)
   useEffect(() => {
+    if (!token) return;
     loadVouchers();
     loadCards();
-  }, []);
+  }, [token]);
+
+  if (!token) return <LoginPage />;
 
   const meta = PAGE_TITLES[activePage] ?? { title: activePage };
 
   const pageActions =
-    activePage === "dashboard" || activePage === "vouchers" || activePage === "wordcloud" ? (
+    activePage === "dashboard" || activePage === "vouchers" ? (
       <div className="flex gap-2">
         <button className="btn-secondary text-sm" onClick={() => setGetOpen(true)}>🎫 Get voucher</button>
         <button className="btn-primary text-sm"   onClick={() => setAddOpen(true)}>+ Add voucher</button>
@@ -71,7 +76,6 @@ export default function App() {
       <Layout title={meta.title} subtitle={meta.subtitle} actions={pageActions}>
         {activePage === "dashboard" && <DashboardPage onAddVoucher={() => setAddOpen(true)} onGetVoucher={() => setGetOpen(true)} onEditVoucher={(id) => { setEditingVoucherId(id); setEditOpen(true); }} />}
         {activePage === "vouchers"  && <VouchersPage  onAdd={() => setAddOpen(true)} onGetVoucher={() => setGetOpen(true)} onEdit={(id) => { setEditingVoucherId(id); setEditOpen(true); }} />}
-        {activePage === "wordcloud" && <WordCloudPage onEdit={(id) => { setEditingVoucherId(id); setEditOpen(true); }} />}
         {activePage === "cards"     && <CardsPage />}
         {activePage === "analytics" && <AnalyticsPage />}
         {activePage === "export"    && <ExportPage />}

@@ -7,6 +7,8 @@ import cardsRouter        from "./routes/cards";
 import autocompleteRouter from "./routes/autocomplete";
 import reportsRouter      from "./routes/reports";
 import auditRouter        from "./routes/audit";
+import authRouter         from "./routes/auth";
+import { requireAuth }    from "./middleware/authMiddleware";
 import { errorHandler }   from "./middleware/errorHandler";
 import { startMonthlyReportJob } from "./jobs/monthlyReport";
 import { startBackupJobs }       from "./jobs/backup";
@@ -18,7 +20,7 @@ const PORT = parseInt(process.env.PORT || "3001", 10);
 app.use(cors({
   origin: process.env.FRONTEND_URL || "http://localhost:5173",
   methods: ["GET", "POST", "PATCH", "DELETE"],
-  allowedHeaders: ["Content-Type"],
+  allowedHeaders: ["Content-Type", "Authorization"],
 }));
 app.use(express.json({ limit: "2mb" }));
 
@@ -29,17 +31,20 @@ if (process.env.NODE_ENV !== "production") {
   });
 }
 
-// ─── Routes ─────────────────────────────────────────────────
+// ─── Public routes (no auth required) ───────────────────────
+app.get("/api/health", (_req, res) => {
+  res.json({ status: "ok", version: "2.0.0", timestamp: new Date().toISOString() });
+});
+app.use("/api/auth", authRouter);
+
+// ─── Protected routes ────────────────────────────────────────
+app.use("/api", requireAuth);
+
 app.use("/api/vouchers",     vouchersRouter);
 app.use("/api/cards",        cardsRouter);
 app.use("/api/autocomplete", autocompleteRouter);
 app.use("/api/audit",        auditRouter);
 app.use("/api",              reportsRouter);   // /api/analytics, /api/export/*
-
-// Health check
-app.get("/api/health", (_req, res) => {
-  res.json({ status: "ok", version: "2.0.0", timestamp: new Date().toISOString() });
-});
 
 // Serve React build in production
 if (process.env.NODE_ENV === "production") {

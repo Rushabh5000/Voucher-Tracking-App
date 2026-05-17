@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { decrypt } from "./encryptionService";
 
 const prisma = new PrismaClient();
 
@@ -40,7 +41,11 @@ export async function buildAnalytics(): Promise<AnalyticsData> {
   const vouchers = await prisma.voucher.findMany({ orderBy: { dateAdded: "asc" } });
   const now = new Date();
 
-  const withStatus: Array<VRow & { effStatus: string }> = (vouchers as VRow[]).map((v: VRow) => ({ ...v, effStatus: effStatus(v) }));
+  const withStatus: Array<VRow & { effStatus: string }> = (vouchers as VRow[]).map((v: VRow) => ({
+    ...v,
+    brand:     decrypt(v.brand),     // decrypt before groupBy
+    effStatus: effStatus(v),
+  }));
 
   const total = withStatus.length;
   const unredeemed = withStatus.filter((v: VRow & { effStatus: string }) => v.effStatus === "UNREDEEMED").length;
