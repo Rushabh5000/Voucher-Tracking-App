@@ -6,6 +6,7 @@ interface NavItem { id: Page; label: string; icon: string; }
 const NAV_ITEMS: NavItem[] = [
   { id: "dashboard", label: "Dashboard",  icon: "⊞" },
   { id: "vouchers",  label: "Vouchers",   icon: "🎫" },
+  { id: "wordcloud", label: "Brand Cloud", icon: "☁" },
   { id: "cards",     label: "Cards",      icon: "💳" },
   { id: "analytics", label: "Analytics",  icon: "📊" },
   { id: "export",    label: "Export",     icon: "⬇" },

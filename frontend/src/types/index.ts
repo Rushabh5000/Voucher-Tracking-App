@@ -107,6 +107,7 @@ export interface AuditListResponse {
 export type Page =
   | "dashboard"
   | "vouchers"
+  | "wordcloud"
   | "cards"
   | "analytics"
   | "export"
