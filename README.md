@@ -1,4 +1,4 @@
-# Voucher Tracker v2
+# Voucher Tracker
 
 > Personal voucher management app for Indian credit and debit card holders.
 > Track RuPay quarterly vouchers and card offer benefits so you never miss a reward.
