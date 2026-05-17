@@ -12,16 +12,13 @@ interface LayoutProps {
 export function Layout({ title, subtitle, actions, children }: LayoutProps) {
   const { sidebarOpen, toggleSidebar } = useUIStore();
 
-  const marginLeft = `${sidebarOpen ? 224 : 64}px`;
-
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       <Sidebar />
 
-      {/* Main content */}
+      {/* Main content — no margin on mobile (sidebar is overlay); shift only on lg+ */}
       <div
-        className="transition-all duration-200 min-h-screen"
-        style={{ marginLeft }}
+        className={`transition-all duration-200 min-h-screen ${sidebarOpen ? "lg:ml-56" : "lg:ml-16"}`}
       >
         {/* Topbar */}
         <header className="sticky top-0 z-10 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-100 dark:border-gray-800">

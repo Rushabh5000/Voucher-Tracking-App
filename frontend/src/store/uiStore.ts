@@ -17,7 +17,7 @@ export const useUIStore = create<UIState>()(
   persist(
     (set, get) => ({
       theme: "light",
-      sidebarOpen: true,
+      sidebarOpen: typeof window !== "undefined" ? window.innerWidth >= 1024 : true,
       activePage: "dashboard",
 
       toggleTheme: () => {
