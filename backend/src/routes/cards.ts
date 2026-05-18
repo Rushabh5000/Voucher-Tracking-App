@@ -8,8 +8,12 @@ import { encrypt, decrypt } from "../services/encryptionService";
 const router = Router();
 const prisma = new PrismaClient();
 
-// Sensitive card fields encrypted at rest
 const ENC_FIELDS = ["accountOwner", "lastFourDigits", "email", "mobileNumber"] as const;
+
+function userWhere(req: Request): { userId: string | null } {
+  const u = req.user!;
+  return { userId: u.role === "admin" ? null : u.userId };
+}
 
 function formatCard(c: any) {
   const d: any = { ...c };
@@ -27,10 +31,13 @@ function cardDetails(c: { cardName: string; lastFourDigits: string; bank: string
   return `${c.cardName} ending ${decrypt(c.lastFourDigits)} (${c.bank})`;
 }
 
-// GET / — list all cards
-router.get("/", async (_req, res: Response, next: NextFunction) => {
+// GET / — list cards for current user
+router.get("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const cards = await prisma.card.findMany({ orderBy: { createdAt: "asc" } });
+    const cards = await prisma.card.findMany({
+      where:   userWhere(req),
+      orderBy: { createdAt: "asc" },
+    });
     res.json({ data: cards.map(formatCard) });
   } catch (e) { next(e); }
 });
@@ -38,7 +45,7 @@ router.get("/", async (_req, res: Response, next: NextFunction) => {
 // GET /:id
 router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const card = await prisma.card.findUnique({ where: { id: req.params.id } });
+    const card = await prisma.card.findFirst({ where: { id: req.params.id, ...userWhere(req) } });
     if (!card) throw new AppError(404, "Card not found");
     res.json({ data: formatCard(card) });
   } catch (e) { next(e); }
@@ -77,10 +84,10 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
         cardName: cardName.trim(),
         bank:     bank.trim(),
         cardType: cardType.trim(),
+        ...userWhere(req),
       },
     });
 
-    // Autocomplete stores plaintext (bank/cardType are not encrypted)
     await Promise.all([
       upsertAutocomplete("accountOwner", accountOwner.trim()),
       upsertAutocomplete("bank",         bank.trim()),
@@ -98,7 +105,7 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
 router.patch("/:id", async (req: Request, res: Response, next: NextFunction) => {
   const startAt = Date.now();
   try {
-    const existing = await prisma.card.findUnique({ where: { id: req.params.id } });
+    const existing = await prisma.card.findFirst({ where: { id: req.params.id, ...userWhere(req) } });
     if (!existing) throw new AppError(404, "Card not found");
 
     const { accountOwner, cardName, bank, cardType, lastFourDigits, email, mobileNumber } = req.body;
@@ -113,7 +120,6 @@ router.patch("/:id", async (req: Request, res: Response, next: NextFunction) => 
       throw new AppError(400, "Mobile number must be up to 10 digits only");
     }
 
-    // For encrypted fields: encrypt new value if provided, otherwise keep existing encrypted value
     const encUpdate: any = {};
     if (accountOwner   !== undefined) encUpdate.accountOwner   = accountOwner.trim()   ? encrypt(accountOwner.trim())   : existing.accountOwner;
     if (lastFourDigits !== undefined) encUpdate.lastFourDigits = lastFourDigits.trim()  ? encrypt(lastFourDigits.trim()) : existing.lastFourDigits;
@@ -139,7 +145,7 @@ router.patch("/:id", async (req: Request, res: Response, next: NextFunction) => 
 router.delete("/:id", async (req: Request, res: Response, next: NextFunction) => {
   const startAt = Date.now();
   try {
-    const existing = await prisma.card.findUnique({ where: { id: req.params.id } });
+    const existing = await prisma.card.findFirst({ where: { id: req.params.id, ...userWhere(req) } });
     if (!existing) throw new AppError(404, "Card not found");
     await prisma.card.delete({ where: { id: req.params.id } });
     auditWriter(req, startAt)("Deleted card", "Card", existing.id, cardDetails(existing));

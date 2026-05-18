@@ -4,7 +4,7 @@ import { useAuthStore } from "@/store/authStore";
 
 // In production (Vercel + Render) VITE_API_URL = "https://your-backend.onrender.com"
 // In local dev it's empty and Vite's proxy handles /api → localhost:3001
-const API_ORIGIN = (import.meta.env.VITE_API_URL as string) || "";
+export const API_ORIGIN = (import.meta.env.VITE_API_URL as string) || "";
 
 const http = axios.create({ baseURL: `${API_ORIGIN}/api` });
 
@@ -86,6 +86,24 @@ export const auditApi = {
     ).toString();
     return authUrl(`/api/audit/export${qs ? "?" + qs : ""}`);
   },
+};
+
+// ─── Auth (pre-login — raw fetch, no axios interceptors) ──────
+export const authApi = {
+  login: (username: string, password: string) =>
+    fetch(`${API_ORIGIN}/api/auth/login`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ username, password }),
+    }),
+  register: (username: string, password: string) =>
+    fetch(`${API_ORIGIN}/api/auth/register`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ username, password }),
+    }),
+  guest: () =>
+    fetch(`${API_ORIGIN}/api/auth/guest`, { method: "POST" }),
 };
 
 // ─── Export ───────────────────────────────────────────────────
