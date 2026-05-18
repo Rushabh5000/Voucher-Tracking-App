@@ -17,10 +17,12 @@ import { AuditPage }      from "@/pages/AuditPage";
 import { SettingsPage }   from "@/pages/SettingsPage";
 import { LoginPage }      from "@/pages/LoginPage";
 import { RegisterPage }   from "@/pages/RegisterPage";
+import { WordCloudPage }  from "@/pages/WordCloudPage";
 
 const PAGE_TITLES: Record<string, { title: string; subtitle?: string }> = {
   dashboard: { title: "Dashboard", subtitle: "Your voucher overview" },
   vouchers:  { title: "My vouchers", subtitle: "All claimed vouchers, oldest first" },
+  wordcloud: { title: "Brand Cloud", subtitle: "Vouchers grouped by brand" },
   cards:     { title: "Cards", subtitle: "Manage your credit and debit cards" },
   analytics: { title: "Analytics", subtitle: "Charts and trends" },
   export:    { title: "Export", subtitle: "Excel, PDF, and email reports" },
@@ -89,6 +91,7 @@ export default function App() {
       <Layout title={meta.title} subtitle={meta.subtitle} actions={pageActions}>
         {activePage === "dashboard" && <DashboardPage onAddVoucher={() => setAddOpen(true)} onGetVoucher={() => setGetOpen(true)} onEditVoucher={(id) => { setEditingVoucherId(id); setEditOpen(true); }} />}
         {activePage === "vouchers"  && <VouchersPage  onAdd={() => setAddOpen(true)} onGetVoucher={() => setGetOpen(true)} onEdit={(id) => { setEditingVoucherId(id); setEditOpen(true); }} />}
+        {activePage === "wordcloud" && <WordCloudPage onEdit={(id) => { setEditingVoucherId(id); setEditOpen(true); }} />}
         {activePage === "cards"     && <CardsPage />}
         {activePage === "analytics" && <AnalyticsPage />}
         {activePage === "export"    && <ExportPage />}
