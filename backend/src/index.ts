@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import path from "path";
+import fs from "fs";
 
 import vouchersRouter     from "./routes/vouchers";
 import cardsRouter        from "./routes/cards";
@@ -46,13 +47,13 @@ app.use("/api/autocomplete", autocompleteRouter);
 app.use("/api/audit",        auditRouter);
 app.use("/api",              reportsRouter);   // /api/analytics, /api/export/*
 
-// Serve React build in production
-if (process.env.NODE_ENV === "production") {
+// Serve React build in production (only when co-located — not when using Vercel)
+if (process.env.NODE_ENV === "production" && !process.env.FRONTEND_URL?.startsWith("https://")) {
   const buildPath = path.join(__dirname, "..", "..", "frontend", "dist");
-  app.use(express.static(buildPath));
-  app.get("*", (_req, res) => {
-    res.sendFile(path.join(buildPath, "index.html"));
-  });
+  if (fs.existsSync(buildPath)) {
+    app.use(express.static(buildPath));
+    app.get("*", (_req, res) => res.sendFile(path.join(buildPath, "index.html")));
+  }
 }
 
 // ─── Error handler (must be last) ───────────────────────────
