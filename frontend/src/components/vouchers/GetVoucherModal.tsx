@@ -68,7 +68,7 @@ export function GetVoucherModal({ open, onClose }: GetVoucherModalProps) {
         step === "select-brand" ? (
           <>
             <button className="btn-secondary" onClick={onClose}>Cancel</button>
-            <button className="btn-primary" onClick={fetchNext} disabled={loading}>
+            <button className="btn-primary" onClick={() => fetchNext()} disabled={loading}>
               {loading ? "Fetching…" : "Get voucher →"}
             </button>
           </>
