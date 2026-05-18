@@ -3,9 +3,61 @@
 > Personal voucher management app for Indian credit and debit card holders.
 > Track RuPay quarterly vouchers and card offer benefits so you never miss a reward.
 
+**Live demo:** [frontend-two-woad-69.vercel.app](https://frontend-two-woad-69.vercel.app) — click **Continue as Guest** to explore instantly.
+
+---
+
+## Screenshots
+
+### Login — Sign in, register, or try as guest
+
+![Login](docs/screenshots/01-login.png)
+
+### Dashboard — Stats at a glance, filtered voucher list
+
+![Dashboard](docs/screenshots/03-dashboard.png)
+
+### Add Voucher — Brand, code, title, dates, and source card
+
+![Add Voucher Modal](docs/screenshots/02-add-voucher-modal.png)
+
+### Get Voucher — Brand-first flow to retrieve the oldest eligible voucher
+
+![Get Voucher Modal](docs/screenshots/10-get-voucher-modal.png)
+
+### My Vouchers — Full list with search, status, and brand filters
+
+![Vouchers Page](docs/screenshots/04-vouchers.png)
+
+### Brand Cloud — All brands grouped, tap any to browse its vouchers
+
+![Brand Cloud](docs/screenshots/05-brand-cloud.png)
+
+### Analytics — Status distribution, expiry alerts, monthly trend
+
+![Analytics](docs/screenshots/06-analytics.png)
+
+### Export — Excel, PDF, and automated monthly email report
+
+![Export](docs/screenshots/07-export.png)
+
+### Audit Log — Every API call logged with timestamps and status codes
+
+![Audit Log](docs/screenshots/08-audit-log.png)
+
+### Dark Mode — Full dark theme across all pages
+
+![Dark Mode](docs/screenshots/09-dark-mode.png)
+
 ---
 
 ## Features
+
+### Authentication & Access
+- **Sign in** — username/password for registered accounts
+- **Register** — create a personal account in seconds
+- **Guest mode** — 2-hour sandbox session; all data is auto-deleted on expiry
+- **Data isolation** — every user sees only their own vouchers and cards
 
 ### Dashboard
 - **Live stats** — Total, Unredeemed, Redeemed, Expired, and Expiring in 7 days, displayed as clickable stat cards that filter the voucher list instantly
@@ -21,6 +73,10 @@
 ### Get Voucher Flow
 - Brand-first selection — pick a brand, then retrieve the oldest eligible unredeemed voucher
 - Supports skipping already-viewed vouchers within the same session via an exclude list
+
+### Brand Cloud
+- Visual word cloud grouping all vouchers by brand
+- Tap any brand to see its vouchers inline
 
 ### Card Management
 - Card master table: account owner, card name, bank, last four digits, email, mobile number
@@ -71,14 +127,17 @@
 | Styling | Tailwind CSS (dark mode built-in) |
 | State | Zustand with persistence |
 | Charts | Recharts |
-| HTTP client | Axios |
+| HTTP client | Fetch API |
 | Backend | Node.js + Express + TypeScript |
 | ORM | Prisma |
 | Database | PostgreSQL 14+ |
+| Auth | JWT (jsonwebtoken) + scrypt password hashing |
 | Export | ExcelJS + PDFKit |
 | Email | Nodemailer (SMTP) |
 | Scheduler | node-cron (IST timezone) |
 | Container | Docker + Compose |
+| Frontend hosting | Vercel |
+| Backend hosting | Render |
 
 ---
 
@@ -162,11 +221,11 @@ For Gmail, generate an App Password at:
 
 ## Database Schema
 
-Three core tables plus one settings table:
+**`User`** — Registered users and guest sessions. `role` is `admin`, `user`, or `guest`. Guest records have an `expiresAt` timestamp; a cleanup cron deletes expired guests every 30 minutes (cascade-deleting all their data).
 
-**`Voucher`** — Core entity. `voucherCode` is unique and normalised to lowercase. `dateAdded` is always server-generated. Effective status is computed from `status` + `expiryDate`.
+**`Voucher`** — Core entity. `voucherCode` is normalised to lowercase. `dateAdded` is always server-generated. Effective status is computed from `status` + `expiryDate`. Scoped to `userId`.
 
-**`Card`** — Card master. Grouped by `bank` in the UI and feeds autocomplete.
+**`Card`** — Card master. Grouped by `bank` in the UI and feeds autocomplete. Scoped to `userId`.
 
 **`AutocompleteEntry`** — One row per `(field, value)` pair. `count` tracks usage frequency for suggestion ranking. Fields: `bank`, `accountOwner`, `email`, `mobileNumber`, `brand`, `sourceProgramOrCard`, `title`.
 
@@ -183,10 +242,11 @@ See [`docs/schema.mermaid`](docs/schema.mermaid) for the full ERD.
 - `dateAdded` is **always server-generated** — never accepted from the frontend
 - **Viewing or fetching a voucher never redeems it** — only an explicit `PATCH .../redeem` does
 - `GET /vouchers/next` skips both redeemed and expired vouchers
-- Duplicate `voucherCode` is rejected at the frontend (instant check) and at the backend (409)
+- Duplicate `voucherCode` is rejected at the frontend (instant check) and at the backend (409) — scoped per user
 - `PATCH .../redeem` is **idempotent** — safe to call multiple times
 - The **Get Voucher flow** requires brand selection first, then fetches the oldest eligible voucher for that brand
 - New autocomplete values are **auto-persisted** on every voucher or card save
+- Guest session data is **automatically deleted** after 2 hours via cascade delete
 
 ---
 
@@ -194,6 +254,9 @@ See [`docs/schema.mermaid`](docs/schema.mermaid) for the full ERD.
 
 | Method | Path | Description |
 |---|---|---|
+| `POST` | `/api/auth/login` | Sign in (admin or registered user) |
+| `POST` | `/api/auth/register` | Create a new account |
+| `POST` | `/api/auth/guest` | Start a 2-hour guest session |
 | `GET` | `/api/health` | Health check |
 | `GET` | `/api/vouchers` | List all vouchers (oldest first) |
 | `GET` | `/api/vouchers/next?brand=X` | Next eligible unredeemed voucher |
@@ -230,52 +293,61 @@ voucher-tracker/
 │   └── src/
 │       ├── index.ts                # Express server entry point
 │       ├── middleware/
+│       │   ├── authMiddleware.ts   # JWT verification + user context
 │       │   ├── auditLogger.ts      # Request/response audit middleware
 │       │   └── errorHandler.ts     # Centralised error handling
 │       ├── routes/
+│       │   ├── auth.ts             # Login, register, guest endpoints
 │       │   ├── vouchers.ts         # Voucher CRUD + /next endpoint
 │       │   ├── cards.ts            # Card CRUD
 │       │   ├── autocomplete.ts     # Suggestion API
 │       │   ├── reports.ts          # Analytics + export endpoints
 │       │   └── audit.ts            # Audit log + export
 │       ├── services/
-│       │   ├── analyticsService.ts # Chart data aggregation
+│       │   ├── analyticsService.ts
 │       │   ├── autocompleteService.ts
 │       │   ├── exportService.ts    # Excel + PDF generation
-│       │   ├── auditService.ts     # Audit writer helper
+│       │   ├── auditService.ts
 │       │   └── emailService.ts     # Nodemailer + PDF attachment
 │       └── jobs/
+│           ├── guestCleanup.ts     # Deletes expired guest sessions every 30m
 │           ├── monthlyReport.ts    # node-cron monthly scheduler
-│           └── backup.ts           # Backup job
+│           └── backup.ts
 │
 ├── frontend/
 │   └── src/
-│       ├── api/client.ts           # Axios API client + typed endpoints
+│       ├── api/client.ts           # Typed API client + auth endpoints
 │       ├── components/
-│       │   ├── layout/             # Sidebar, Layout, topbar
+│       │   ├── layout/             # Sidebar, Layout, topbar, guest countdown
 │       │   ├── ui/                 # SmartInput, Modal, ConfirmDialog
 │       │   ├── vouchers/           # Add, Edit, Get voucher modals + VoucherCard
 │       │   └── cards/              # CardModal
 │       ├── pages/
-│       │   ├── DashboardPage.tsx   # Stats + filtered voucher list
-│       │   ├── VouchersPage.tsx    # Full list with search and filters
-│       │   ├── CardsPage.tsx       # Card management grouped by bank
-│       │   ├── AnalyticsPage.tsx   # Recharts — pie, bar, line
-│       │   ├── ExportPage.tsx      # Download buttons + manual email trigger
-│       │   ├── AuditPage.tsx       # Audit log table with filters + export
-│       │   └── SettingsPage.tsx    # Theme switcher + field values manager
+│       │   ├── LoginPage.tsx
+│       │   ├── RegisterPage.tsx
+│       │   ├── DashboardPage.tsx
+│       │   ├── VouchersPage.tsx
+│       │   ├── WordCloudPage.tsx
+│       │   ├── CardsPage.tsx
+│       │   ├── AnalyticsPage.tsx
+│       │   ├── ExportPage.tsx
+│       │   ├── AuditPage.tsx
+│       │   └── SettingsPage.tsx
 │       ├── store/
 │       │   ├── uiStore.ts          # Theme, sidebar, active page
+│       │   ├── authStore.ts        # Token, role, guest expiry
 │       │   ├── voucherStore.ts     # Voucher CRUD + derived selectors
 │       │   └── cardStore.ts        # Card CRUD
-│       ├── types/index.ts          # Shared TypeScript types
-│       └── utils/formatters.ts     # Date, status, and value helpers
+│       ├── types/index.ts
+│       └── utils/formatters.ts
 │
 ├── docs/
-│   ├── API.md                      # Full API reference
-│   └── schema.mermaid              # ERD diagram
+│   ├── screenshots/                # README screenshots
+│   ├── API.md
+│   └── schema.mermaid
 │
-├── scripts/setup.js                # First-time setup script
+├── scripts/setup.js
+├── vercel.json
 ├── docker-compose.yml
-└── package.json                    # Root dev scripts
+└── package.json
 ```
