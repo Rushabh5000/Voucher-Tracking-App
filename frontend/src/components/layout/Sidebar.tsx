@@ -1,6 +1,6 @@
-import { useUIStore }  from "@/store/uiStore";
-import { useAuthStore } from "@/store/authStore";
-import type { Page } from "@/types";
+import { useUIStore }   from "@/store/uiStore";
+import { useAuthStore }  from "@/store/authStore";
+import type { Page }     from "@/types";
 
 interface NavItem { id: Page; label: string; icon: string; }
 
@@ -16,7 +16,7 @@ const NAV_ITEMS: NavItem[] = [
 
 export function Sidebar() {
   const { activePage, setActivePage, sidebarOpen, toggleSidebar, theme, toggleTheme } = useUIStore();
-  const { logout } = useAuthStore();
+  const { logout, username, role } = useAuthStore();
 
   return (
     <>
@@ -43,7 +43,9 @@ export function Sidebar() {
           {sidebarOpen && (
             <div className="overflow-hidden">
               <div className="font-semibold text-sm text-gray-900 dark:text-gray-100 whitespace-nowrap">Voucher Tracker</div>
-              <div className="text-xs text-gray-400 whitespace-nowrap">India Card Benefits</div>
+              <div className="text-xs text-gray-400 whitespace-nowrap truncate max-w-[140px]">
+                {role === "guest" ? "Guest session" : username ?? "India Card Benefits"}
+              </div>
             </div>
           )}
         </div>
