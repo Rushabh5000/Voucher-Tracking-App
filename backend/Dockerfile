@@ -30,7 +30,7 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY prisma ./prisma
 
-# Run migrations then start
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
+# Start the server (schema is pre-applied via Supabase Management API)
+CMD ["node", "dist/index.js"]
 
 EXPOSE 3001
