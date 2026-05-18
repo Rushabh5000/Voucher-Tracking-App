@@ -13,6 +13,7 @@ import { requireAuth }    from "./middleware/authMiddleware";
 import { errorHandler }   from "./middleware/errorHandler";
 import { startMonthlyReportJob } from "./jobs/monthlyReport";
 import { startBackupJobs }       from "./jobs/backup";
+import { startGuestCleanupJob }  from "./jobs/guestCleanup";
 
 const app  = express();
 const PORT = parseInt(process.env.PORT || "3001", 10);
@@ -65,6 +66,7 @@ app.listen(PORT, () => {
   console.log(`    Health: http://localhost:${PORT}/api/health\n`);
   startMonthlyReportJob();
   startBackupJobs().catch(err => console.error("[Backup] Job startup error:", err));
+  startGuestCleanupJob();
 });
 
 export default app;
