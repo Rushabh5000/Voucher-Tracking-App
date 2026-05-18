@@ -8,8 +8,12 @@ import { encrypt, decrypt, hmac } from "../services/encryptionService";
 const router = Router();
 const prisma = new PrismaClient();
 
-// Fields encrypted at rest — decrypt before sending to client
 const ENC_FIELDS = ["voucherCode", "brand", "title", "sourceProgramOrCard", "description", "emailId", "cardOwner", "cardName"] as const;
+
+function userWhere(req: Request): { userId: string | null } {
+  const u = req.user!;
+  return { userId: u.role === "admin" ? null : u.userId };
+}
 
 function effectiveStatus(v: { status: string; expiryDate: Date | null | undefined }): string {
   if (v.status === "REDEEMED") return "REDEEMED";
@@ -34,23 +38,26 @@ function voucherLabel(v: { brand: string; voucherCode: string }): string {
   return `${decrypt(v.brand)} | ${decrypt(v.voucherCode)}`;
 }
 
-// GET / — list all
-router.get("/", async (_req: Request, res: Response, next: NextFunction) => {
+// GET / — list all for current user
+router.get("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const vouchers = await prisma.voucher.findMany({ orderBy: { dateAdded: "asc" } });
+    const vouchers = await prisma.voucher.findMany({
+      where:   userWhere(req),
+      orderBy: { dateAdded: "asc" },
+    });
     res.json({ data: vouchers.map(formatVoucher) });
   } catch (e) { next(e); }
 });
 
-// GET /next — next eligible (optionally by brand, optionally excluding IDs) — must be before /:id
+// GET /next — next eligible
 router.get("/next", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { brand, exclude } = req.query as { brand?: string; exclude?: string };
     const excludeIds = exclude ? exclude.split(",").filter(Boolean) : [];
 
-    // Fetch all unredeemed non-expired vouchers; filter brand in memory (brand is encrypted)
     const candidates = await prisma.voucher.findMany({
       where: {
+        ...userWhere(req),
         status: "UNREDEEMED",
         OR: [{ expiryDate: null }, { expiryDate: { gte: new Date() } }],
         ...(excludeIds.length > 0 ? { id: { notIn: excludeIds } } : {}),
@@ -69,7 +76,7 @@ router.get("/next", async (req: Request, res: Response, next: NextFunction) => {
 // GET /:id
 router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const voucher = await prisma.voucher.findUnique({ where: { id: req.params.id } });
+    const voucher = await prisma.voucher.findFirst({ where: { id: req.params.id, ...userWhere(req) } });
     if (!voucher) throw new AppError(404, "Voucher not found");
     res.json({ data: formatVoucher(voucher) });
   } catch (e) { next(e); }
@@ -90,7 +97,8 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     const normalizedCode = voucherCode.trim().toLowerCase();
     const codeHash = hmac(normalizedCode);
 
-    const dup = await prisma.voucher.findUnique({ where: { voucherCodeHash: codeHash } });
+    // Per-user uniqueness check (admin data: userId IS NULL)
+    const dup = await prisma.voucher.findFirst({ where: { voucherCodeHash: codeHash, ...userWhere(req) } });
     if (dup) throw new AppError(409, "A voucher with this code already exists");
 
     const voucher = await prisma.voucher.create({
@@ -108,10 +116,10 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
         voucherCodeHash: codeHash,
         expiryDate: expiryDate ? new Date(expiryDate) : null,
         issueDate:  issueDate  ? new Date(issueDate)  : new Date(),
+        ...userWhere(req),
       },
     });
 
-    // Autocomplete stores plaintext (suggestion hints only, not sensitive on their own)
     const acFields: Array<[string, string]> = [
       ["brand",               brand.trim()],
       ["title",               (title || "").trim()],
@@ -138,7 +146,7 @@ router.patch("/:id", async (req: Request, res: Response, next: NextFunction) => 
       expiryDate, issueDate, emailId, cardOwner, cardName,
     } = req.body;
 
-    const existing = await prisma.voucher.findUnique({ where: { id: req.params.id } });
+    const existing = await prisma.voucher.findFirst({ where: { id: req.params.id, ...userWhere(req) } });
     if (!existing) throw new AppError(404, "Voucher not found");
     if (!brand?.trim()) throw new AppError(400, "brand is required");
 
@@ -180,7 +188,7 @@ router.patch("/:id", async (req: Request, res: Response, next: NextFunction) => 
 router.patch("/:id/redeem", async (req: Request, res: Response, next: NextFunction) => {
   const startAt = Date.now();
   try {
-    const existing = await prisma.voucher.findUnique({ where: { id: req.params.id } });
+    const existing = await prisma.voucher.findFirst({ where: { id: req.params.id, ...userWhere(req) } });
     if (!existing) throw new AppError(404, "Voucher not found");
     if (existing.status === "REDEEMED") { res.json({ data: formatVoucher(existing) }); return; }
     const updated = await prisma.voucher.update({
@@ -196,7 +204,7 @@ router.patch("/:id/redeem", async (req: Request, res: Response, next: NextFuncti
 router.patch("/:id/unredeem", async (req: Request, res: Response, next: NextFunction) => {
   const startAt = Date.now();
   try {
-    const existing = await prisma.voucher.findUnique({ where: { id: req.params.id } });
+    const existing = await prisma.voucher.findFirst({ where: { id: req.params.id, ...userWhere(req) } });
     if (!existing) throw new AppError(404, "Voucher not found");
     const updated = await prisma.voucher.update({
       where: { id: req.params.id },
@@ -211,7 +219,7 @@ router.patch("/:id/unredeem", async (req: Request, res: Response, next: NextFunc
 router.delete("/:id", async (req: Request, res: Response, next: NextFunction) => {
   const startAt = Date.now();
   try {
-    const existing = await prisma.voucher.findUnique({ where: { id: req.params.id } });
+    const existing = await prisma.voucher.findFirst({ where: { id: req.params.id, ...userWhere(req) } });
     if (!existing) throw new AppError(404, "Voucher not found");
     await prisma.voucher.delete({ where: { id: req.params.id } });
     auditWriter(req, startAt)("Deleted voucher", "Voucher", existing.id, voucherLabel(existing));

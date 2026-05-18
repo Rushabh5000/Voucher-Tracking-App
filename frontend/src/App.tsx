@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Toaster } from "react-hot-toast";
 import { useUIStore }     from "@/store/uiStore";
 import { useAuthStore }   from "@/store/authStore";
@@ -16,7 +16,7 @@ import { ExportPage }     from "@/pages/ExportPage";
 import { AuditPage }      from "@/pages/AuditPage";
 import { SettingsPage }   from "@/pages/SettingsPage";
 import { LoginPage }      from "@/pages/LoginPage";
-import { useState }       from "react";
+import { RegisterPage }   from "@/pages/RegisterPage";
 
 const PAGE_TITLES: Record<string, { title: string; subtitle?: string }> = {
   dashboard: { title: "Dashboard", subtitle: "Your voucher overview" },
@@ -29,11 +29,12 @@ const PAGE_TITLES: Record<string, { title: string; subtitle?: string }> = {
 };
 
 export default function App() {
-  const { token }      = useAuthStore();
+  const { token, role, guestExpiresAt, logout } = useAuthStore();
   const { activePage } = useUIStore();
   const { load: loadVouchers } = useVoucherStore();
   const { load: loadCards }    = useCardStore();
 
+  const [authView, setAuthView] = useState<"login" | "register">("login");
   const [addOpen, setAddOpen] = useState(false);
   const [getOpen, setGetOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -50,14 +51,28 @@ export default function App() {
     }
   }, []);
 
-  // Load data whenever the token changes (covers: initial load after refresh + right after login)
+  // Load data whenever the token changes
   useEffect(() => {
     if (!token) return;
     loadVouchers();
     loadCards();
   }, [token]);
 
-  if (!token) return <LoginPage />;
+  // Auto-logout when guest session expires
+  useEffect(() => {
+    if (!guestExpiresAt || role !== "guest") return;
+    const diff = new Date(guestExpiresAt).getTime() - Date.now();
+    if (diff <= 0) { logout(); return; }
+    const id = setTimeout(logout, diff);
+    return () => clearTimeout(id);
+  }, [guestExpiresAt, role]);
+
+  if (!token) {
+    if (authView === "register") {
+      return <RegisterPage onShowLogin={() => setAuthView("login")} />;
+    }
+    return <LoginPage onShowRegister={() => setAuthView("register")} />;
+  }
 
   const meta = PAGE_TITLES[activePage] ?? { title: activePage };
 
@@ -67,9 +82,7 @@ export default function App() {
         <button className="btn-secondary text-sm" onClick={() => setGetOpen(true)}>🎫 Get voucher</button>
         <button className="btn-primary text-sm"   onClick={() => setAddOpen(true)}>+ Add voucher</button>
       </div>
-    ) : activePage === "cards" ? (
-      null // CardsPage has its own button
-    ) : null;
+    ) : activePage === "cards" ? null : null;
 
   return (
     <>
