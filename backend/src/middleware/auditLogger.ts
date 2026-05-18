@@ -4,20 +4,21 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 const SKIP_PATHS = new Set(["/api/health"]);
-const SENSITIVE_KEYS = /^(password|pass|token|secret|key|auth|credential|pwd|pin)$/i;
 
-function sanitizeBody(body: unknown): string | undefined {
-  if (!body || typeof body !== "object" || Object.keys(body as object).length === 0) return undefined;
-  try {
-    const cleaned = JSON.parse(JSON.stringify(body));
-    for (const k of Object.keys(cleaned)) {
-      if (SENSITIVE_KEYS.test(k)) cleaned[k] = "***";
-    }
-    const str = JSON.stringify(cleaned);
-    return str.length > 1000 ? str.slice(0, 997) + "…" : str;
-  } catch {
-    return undefined;
-  }
+function deriveEntity(path: string): string {
+  const seg = path.split("/").filter(Boolean)[1] ?? "unknown";
+  const map: Record<string, string> = {
+    vouchers: "Voucher", cards: "Card", autocomplete: "AutocompleteEntry",
+    export: "Export", analytics: "Analytics", audit: "AuditLog", auth: "Auth",
+  };
+  return map[seg] ?? seg;
+}
+
+function deriveAction(method: string, entity: string): string {
+  const verbs: Record<string, string> = {
+    GET: "Listed", POST: "Created", PATCH: "Updated", PUT: "Replaced", DELETE: "Deleted",
+  };
+  return `${verbs[method] ?? method} ${entity}`;
 }
 
 export function auditLogger(req: Request, res: Response, next: NextFunction): void {
@@ -29,20 +30,20 @@ export function auditLogger(req: Request, res: Response, next: NextFunction): vo
   const startAt = Date.now();
 
   res.on("finish", () => {
-    const durationMs  = Date.now() - startAt;
-    const requestBody = ["POST", "PATCH", "PUT"].includes(req.method)
-      ? sanitizeBody(req.body)
-      : undefined;
+    const durationMs = Date.now() - startAt;
+    const entity     = deriveEntity(req.path);
+    const action     = deriveAction(req.method, entity);
 
     prisma.auditLog.create({
       data: {
-        method:      req.method,
-        path:        req.path,
-        statusCode:  res.statusCode,
+        action,
+        entity,
+        method:     req.method,
+        path:       req.path,
+        statusCode: res.statusCode,
         durationMs,
-        requestBody,
-        ipAddress:   req.ip ?? null,
-        userAgent:   req.get("user-agent") ?? null,
+        ipAddress:  req.ip ?? null,
+        userAgent:  req.get("user-agent") ?? null,
       },
     }).catch(err => console.error("[Audit] Write failed:", err));
   });
