@@ -1,8 +1,15 @@
 // One-time migration script: clear remote + apply schema + (optionally) dump local → remote
+// Usage: REMOTE_DB=<supabase-url> node migrate.js <command>
 const { Client } = require('pg');
 
-const REMOTE = 'postgresql://postgres.wwmvrbdtvqcxaccicoxc:VoucherTracker%402026!@aws-1-ap-south-1.pooler.supabase.com:5432/postgres';
+const REMOTE = process.env.REMOTE_DB;
 const LOCAL  = process.env.LOCAL_DB || 'postgresql://voucher_user:voucher_pass@localhost:5432/voucher_tracker';
+
+if (!REMOTE) {
+  console.error('Error: REMOTE_DB environment variable is required.');
+  console.error('  Example: REMOTE_DB="postgresql://user:pass@host:5432/db" node migrate.js status');
+  process.exit(1);
+}
 
 async function connect(url, label) {
   const client = new Client({ connectionString: url, ssl: url.includes('supabase') ? { rejectUnauthorized: false } : false });
