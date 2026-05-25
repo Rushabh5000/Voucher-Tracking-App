@@ -92,7 +92,7 @@ export default function App() {
         {activePage === "dashboard" && <DashboardPage onAddVoucher={() => setAddOpen(true)} onGetVoucher={() => setGetOpen(true)} onEditVoucher={(id) => { setEditingVoucherId(id); setEditOpen(true); }} />}
         {activePage === "vouchers"  && <VouchersPage  onAdd={() => setAddOpen(true)} onGetVoucher={() => setGetOpen(true)} onEdit={(id) => { setEditingVoucherId(id); setEditOpen(true); }} />}
         {activePage === "wordcloud" && <WordCloudPage onEdit={(id) => { setEditingVoucherId(id); setEditOpen(true); }} />}
-        {activePage === "cards"     && <CardsPage />}
+        {activePage === "cards"     && <CardsPage onEditVoucher={(id) => { setEditingVoucherId(id); setEditOpen(true); }} />}
         {activePage === "analytics" && <AnalyticsPage />}
         {activePage === "export"    && <ExportPage />}
         {activePage === "audit"     && <AuditPage />}

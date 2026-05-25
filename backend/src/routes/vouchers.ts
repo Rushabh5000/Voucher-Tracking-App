@@ -126,7 +126,7 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
       ["sourceProgramOrCard", (sourceProgramOrCard || "").trim()],
     ];
     await Promise.all(
-      acFields.filter(([, v]) => v.trim()).map(([field, value]) => upsertAutocomplete(field, value))
+      acFields.filter(([, v]) => v.trim()).map(([field, value]) => upsertAutocomplete(field, value, req.user?.userId ?? null))
     );
 
     auditWriter(req, startAt)(
@@ -173,7 +173,7 @@ router.patch("/:id", async (req: Request, res: Response, next: NextFunction) => 
       ["sourceProgramOrCard", (sourceProgramOrCard || "").trim()],
     ];
     await Promise.all(
-      acFields.filter(([, v]) => v.trim()).map(([field, value]) => upsertAutocomplete(field, value))
+      acFields.filter(([, v]) => v.trim()).map(([field, value]) => upsertAutocomplete(field, value, req.user?.userId ?? null))
     );
 
     auditWriter(req, startAt)(

@@ -121,6 +121,14 @@ export function LoginPage({ onShowRegister }: Props) {
         <p className="text-center text-xs text-gray-400 mt-4">
           Guest sessions expire after 2 hours and all data is deleted.
         </p>
+
+        <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-2.5 text-xs text-amber-700 dark:text-amber-300">
+          <span className="mt-px shrink-0">⏱</span>
+          <span>
+            <span className="font-medium">First load may take up to 60 seconds.</span>
+            {" "}The backend spins down when idle — it wakes up automatically on your first request.
+          </span>
+        </div>
       </div>
     </div>
   );
