@@ -88,12 +88,13 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
       },
     });
 
+    const uid = req.user?.userId ?? null;
     await Promise.all([
-      upsertAutocomplete("accountOwner", accountOwner.trim()),
-      upsertAutocomplete("bank",         bank.trim()),
-      upsertAutocomplete("cardType",     cardType.trim()),
-      email        ? upsertAutocomplete("email",        email.trim())        : Promise.resolve(),
-      mobileNumber ? upsertAutocomplete("mobileNumber", mobileNumber.trim()) : Promise.resolve(),
+      upsertAutocomplete("accountOwner", accountOwner.trim(), uid),
+      upsertAutocomplete("bank",         bank.trim(),         uid),
+      upsertAutocomplete("cardType",     cardType.trim(),     uid),
+      email        ? upsertAutocomplete("email",        email.trim(),        uid) : Promise.resolve(),
+      mobileNumber ? upsertAutocomplete("mobileNumber", mobileNumber.trim(), uid) : Promise.resolve(),
     ]);
 
     auditWriter(req, startAt)("Created card", "Card", card.id, cardDetails(card), 201);
