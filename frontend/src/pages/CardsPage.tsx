@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useCardStore } from "@/store/cardStore";
 import { useVoucherStore } from "@/store/voucherStore";
+import { sortVouchers } from "@/utils/formatters";
 import { CardModal } from "@/components/cards/CardModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { VoucherCard } from "@/components/vouchers/VoucherCard";
@@ -84,9 +85,10 @@ export function CardsPage({ onEditVoucher }: { onEditVoucher: (id: string) => vo
   // Vouchers for whichever card is currently expanded
   const cardVouchers = useMemo(() => {
     if (!selectedCard) return [];
-    return vouchers
-      .filter(v => v.cardName === selectedCard.cardName && v.cardOwner === selectedCard.accountOwner)
-      .sort((a, b) => new Date(a.dateAdded).getTime() - new Date(b.dateAdded).getTime());
+    const matched = vouchers.filter(
+      v => v.cardName === selectedCard.cardName && v.cardOwner === selectedCard.accountOwner
+    );
+    return sortVouchers(matched);
   }, [vouchers, selectedCard]);
 
   // Voucher count badge per card

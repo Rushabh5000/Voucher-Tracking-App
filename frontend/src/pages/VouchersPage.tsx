@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useVoucherStore } from "@/store/voucherStore";
 import { useCardStore } from "@/store/cardStore";
 import { VoucherCard } from "@/components/vouchers/VoucherCard";
+import { sortVouchers } from "@/utils/formatters";
 
 interface VouchersPageProps {
   onAdd: () => void;
@@ -42,7 +43,7 @@ export function VouchersPage({ onAdd, onGetVoucher, onEdit }: VouchersPageProps)
         v.sourceProgramOrCard.toLowerCase().includes(q)
       );
     }
-    return vs.sort((a, b) => new Date(a.dateAdded).getTime() - new Date(b.dateAdded).getTime());
+    return sortVouchers(vs);
   }, [vouchers, statusFilter, brandFilter, selectedCard, query]);
 
   const hasFilters = statusFilter !== "ALL" || brandFilter !== "ALL" || cardFilter !== "ALL" || !!query.trim();
@@ -118,7 +119,7 @@ export function VouchersPage({ onAdd, onGetVoucher, onEdit }: VouchersPageProps)
 
       {/* Count */}
       <div className="text-xs text-gray-400">
-        {filtered.length} voucher{filtered.length !== 1 ? "s" : ""} — sorted oldest first
+        {filtered.length} voucher{filtered.length !== 1 ? "s" : ""} — unredeemed first · earliest expiry first · redeemed last
       </div>
 
       {/* List */}
