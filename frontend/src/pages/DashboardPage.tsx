@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useVoucherStore } from "@/store/voucherStore";
 import { VoucherCard } from "@/components/vouchers/VoucherCard";
+import { sortVouchers } from "@/utils/formatters";
 
 interface DashboardPageProps {
   onAddVoucher: () => void;
@@ -64,7 +65,7 @@ export function DashboardPage({ onAddVoucher, onGetVoucher, onEditVoucher }: Das
       // "ALL": no status filter
     }
     if (brandFilter !== "ALL") vs = vs.filter(v => v.brand === brandFilter);
-    return vs.sort((a, b) => new Date(a.dateAdded).getTime() - new Date(b.dateAdded).getTime());
+    return sortVouchers(vs);
   }, [vouchers, statusFilter, brandFilter, now]);
 
   const hasFilters   = statusFilter !== "UNREDEEMED" || brandFilter !== "ALL";

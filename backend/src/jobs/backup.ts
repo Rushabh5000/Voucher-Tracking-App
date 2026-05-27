@@ -86,13 +86,15 @@ export async function backupSourceCode(): Promise<void> {
 
 // ─── Database Backup ─────────────────────────────────────────────────────────
 // Always runs on server startup.
-// Strategy 1: pg_dump on the host (if installed).
-// Strategy 2: pg_dump inside the Docker container via docker exec + docker cp.
+// Strategy 1: host pg_dump (if installed, any version ≥ server).
+// Strategy 2: docker run postgres:17-alpine — version-matched, works for Supabase.
+// Strategy 3: docker exec vt-postgres — local DB only.
+// Strategy 4: Prisma JSON export — universal fallback, no external tools needed.
 
 export async function backupDatabase(): Promise<void> {
-  const dir     = backupDir();
-  const outDir  = path.join(dir, "db");
-  const outFile = path.join(outDir, `voucher-tracker-db-${datestamp()}.dump`);
+  const dir    = backupDir();
+  const outDir = path.join(dir, "db");
+  const stamp  = datestamp();
 
   const dbUrl = process.env.DATABASE_URL || "";
   const match = dbUrl.match(/postgresql:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/([^?]+)/);
@@ -101,53 +103,109 @@ export async function backupDatabase(): Promise<void> {
     return;
   }
 
-  const [, user, password, , , dbname] = match;
+  const [, dbUser, dbPass, dbHost, dbPort, dbName] = match;
+  const isRemote = dbHost !== "localhost" && dbHost !== "127.0.0.1";
   fs.mkdirSync(outDir, { recursive: true });
 
+  const dumpFile = path.join(outDir, `voucher-tracker-db-${stamp}.dump`);
+
   // ── Strategy 1: host pg_dump ────────────────────────────────────────────────
-  const hostArgs = `-U ${user} -d ${dbname} -F c -f "${outFile}"`;
-  const hostEnv  = { ...process.env, PGPASSWORD: password };
+  const sslSuffix = isRemote ? "?sslmode=require" : "";
+  const connStr   = `postgresql://${dbUser}:${encodeURIComponent(dbPass)}@${dbHost}:${dbPort}/${dbName}${sslSuffix}`;
+  const connArgs  = `--dbname="${connStr}" -F c -f "${dumpFile}"`;
+  const hostEnv   = { ...process.env, PGPASSWORD: dbPass };
 
-  const hostCandidates = [
-    `pg_dump ${hostArgs}`,
-    `"C:\\Program Files\\PostgreSQL\\17\\bin\\pg_dump.exe" ${hostArgs}`,
-    `"C:\\Program Files\\PostgreSQL\\16\\bin\\pg_dump.exe" ${hostArgs}`,
-    `"C:\\Program Files\\PostgreSQL\\15\\bin\\pg_dump.exe" ${hostArgs}`,
-    `"C:\\Program Files\\PostgreSQL\\14\\bin\\pg_dump.exe" ${hostArgs}`,
-  ];
-
-  for (const cmd of hostCandidates) {
+  for (const cmd of [
+    `pg_dump ${connArgs}`,
+    `"C:\\Program Files\\PostgreSQL\\17\\bin\\pg_dump.exe" ${connArgs}`,
+    `"C:\\Program Files\\PostgreSQL\\16\\bin\\pg_dump.exe" ${connArgs}`,
+    `"C:\\Program Files\\PostgreSQL\\15\\bin\\pg_dump.exe" ${connArgs}`,
+    `"C:\\Program Files\\PostgreSQL\\14\\bin\\pg_dump.exe" ${connArgs}`,
+  ]) {
     try {
       await execAsync(cmd, { env: hostEnv, windowsHide: true });
-      console.log(`[Backup] Database (host pg_dump) → ${outFile}`);
+      console.log(`[Backup] Database (host pg_dump) → ${dumpFile}`);
       return;
-    } catch {
-      // try next candidate
+    } catch { /* try next */ }
+  }
+
+  // ── Strategy 2: docker run postgres:17-alpine (version-matched for remote) ──
+  // Pulls the image once if not cached; subsequent runs are instant.
+  if (isRemote) {
+    // Docker Desktop on Windows accepts forward-slash paths: C:\foo\bar → C:/foo/bar
+    const mountPath = outDir.replace(/\\/g, "/");
+    const dockerRunCmd = [
+      `docker run --rm`,
+      `-e PGPASSWORD=${dbPass}`,
+      `-e PGSSLMODE=require`,
+      `-v "${mountPath}:/backup"`,
+      `postgres:17-alpine`,
+      `pg_dump -h ${dbHost} -p ${dbPort} -U ${dbUser} -d ${dbName} --no-password`,
+      `-F c -f /backup/voucher-tracker-db-${stamp}.dump`,
+    ].join(" ");
+
+    try {
+      await execAsync(dockerRunCmd, { windowsHide: true, timeout: 120_000 });
+      console.log(`[Backup] Database (docker run postgres:17-alpine) → ${dumpFile}`);
+      return;
+    } catch (err: any) {
+      console.warn(`[Backup] docker run strategy failed: ${err.message?.split("\n")[0]}`);
     }
   }
 
-  // ── Strategy 2: pg_dump inside the Docker container ────────────────────────
-  const container  = process.env.DB_CONTAINER_NAME || "vt-postgres";
-  const tmpInside  = `/tmp/vt-db-backup-${Date.now()}.dump`;
+  // ── Strategy 3: docker exec inside running vt-postgres (local DB only) ──────
+  if (!isRemote) {
+    const container = process.env.DB_CONTAINER_NAME || "vt-postgres";
+    const tmpInside = `/tmp/vt-db-backup-${Date.now()}.dump`;
+    try {
+      await execAsync(
+        `docker exec -e PGPASSWORD=${dbPass} ${container} pg_dump -U ${dbUser} -d ${dbName} -F c -f ${tmpInside}`,
+        { windowsHide: true }
+      );
+      await execAsync(`docker cp ${container}:${tmpInside} "${dumpFile}"`, { windowsHide: true });
+      await execAsync(`docker exec ${container} rm ${tmpInside}`, { windowsHide: true }).catch(() => {});
+      console.log(`[Backup] Database (docker exec local) → ${dumpFile}`);
+      return;
+    } catch { /* fall through */ }
+  }
 
+  // ── Strategy 4: Prisma JSON export ──────────────────────────────────────────
+  // No external tools required. Works for any DB, any version, any platform.
+  await backupDatabaseAsJson(outDir, stamp);
+}
+
+async function backupDatabaseAsJson(outDir: string, stamp: string): Promise<void> {
   try {
-    // Run pg_dump inside the container (pg_dump is bundled with the postgres image)
-    await execAsync(
-      `docker exec -e PGPASSWORD=${password} ${container} pg_dump -U ${user} -d ${dbname} -F c -f ${tmpInside}`,
-      { windowsHide: true }
-    );
-    // Copy the dump file from the container to the host backup directory
-    await execAsync(`docker cp ${container}:${tmpInside} "${outFile}"`, { windowsHide: true });
-    // Remove the temp file from the container
-    await execAsync(`docker exec ${container} rm ${tmpInside}`, { windowsHide: true }).catch(() => {});
+    const [vouchers, cards, autocomplete, settings] = await Promise.all([
+      prisma.voucher.findMany(),
+      prisma.card.findMany(),
+      prisma.autocompleteEntry.findMany(),
+      prisma.appSetting.findMany(),
+    ]);
+    // Audit log: last 10k rows only (can be large)
+    const auditLogs = await prisma.auditLog.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 10_000,
+    });
 
-    console.log(`[Backup] Database (docker exec) → ${outFile}`);
-  } catch (dockerErr: any) {
-    console.warn(
-      `[Backup] DB backup failed — neither host pg_dump nor docker exec worked.\n` +
-      `         Container tried: "${container}" (set DB_CONTAINER_NAME in .env to override)\n` +
-      `         Docker error: ${dockerErr.message?.split("\n")[0] ?? dockerErr}`
+    const backup = {
+      exportedAt: new Date().toISOString(),
+      tables: {
+        Voucher:           vouchers,
+        Card:              cards,
+        AutocompleteEntry: autocomplete,
+        AppSetting:        settings,
+        AuditLog:          auditLogs,
+      },
+    };
+
+    const outFile = path.join(outDir, `voucher-tracker-db-${stamp}.json`);
+    fs.writeFileSync(outFile, JSON.stringify(backup, null, 2));
+    console.log(
+      `[Backup] Database (JSON export — ${vouchers.length} vouchers, ${cards.length} cards) → ${outFile}`
     );
+  } catch (err: any) {
+    console.error(`[Backup] JSON export failed: ${err.message}`);
   }
 }
 

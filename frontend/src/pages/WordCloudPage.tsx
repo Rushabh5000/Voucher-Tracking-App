@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useVoucherStore } from "@/store/voucherStore";
 import { VoucherCard } from "@/components/vouchers/VoucherCard";
+import { sortVouchers } from "@/utils/formatters";
 import type { VoucherStatus } from "@/types";
 
 const WORD_COLORS = [
@@ -65,7 +66,7 @@ export function WordCloudPage({ onEdit }: Props) {
     if (!selectedBrand) return [];
     let vs = vouchers.filter((v) => v.brand === selectedBrand);
     if (statusFilter !== "ALL") vs = vs.filter((v) => v.status === statusFilter);
-    return vs.sort((a, b) => new Date(a.dateAdded).getTime() - new Date(b.dateAdded).getTime());
+    return sortVouchers(vs);
   }, [vouchers, selectedBrand, statusFilter]);
 
   const selectedStat = selectedBrand ? brandStats.find((b) => b.brand === selectedBrand) : null;
@@ -181,7 +182,7 @@ export function WordCloudPage({ onEdit }: Props) {
           </div>
 
           <div className="text-xs text-gray-400">
-            {filteredVouchers.length} voucher{filteredVouchers.length !== 1 ? "s" : ""} — sorted oldest first
+            {filteredVouchers.length} voucher{filteredVouchers.length !== 1 ? "s" : ""} — unredeemed first · earliest expiry first · redeemed last
           </div>
 
           {filteredVouchers.length === 0 ? (

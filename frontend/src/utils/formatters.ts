@@ -1,5 +1,35 @@
 import type { Voucher } from "@/types";
 
+/**
+ * Universal voucher sort:
+ *   1. Non-redeemed (UNREDEEMED + EXPIRED) — earliest expiry first, no-expiry last
+ *   2. Redeemed — most recently redeemed first
+ */
+export function sortVouchers(vouchers: Voucher[]): Voucher[] {
+  return [...vouchers].sort((a, b) => {
+    const aRedeemed = a.status === "REDEEMED" ? 1 : 0;
+    const bRedeemed = b.status === "REDEEMED" ? 1 : 0;
+
+    // Redeemed always sinks to the bottom
+    if (aRedeemed !== bRedeemed) return aRedeemed - bRedeemed;
+
+    // Both redeemed → most recently redeemed first
+    if (aRedeemed === 1) {
+      const aT = a.redeemedAt ? new Date(a.redeemedAt).getTime() : new Date(a.dateAdded).getTime();
+      const bT = b.redeemedAt ? new Date(b.redeemedAt).getTime() : new Date(b.dateAdded).getTime();
+      return bT - aT;
+    }
+
+    // Both non-redeemed → earliest expiry first; no-expiry vouchers go last
+    const aExp = a.expiryDate ? new Date(a.expiryDate).getTime() : Infinity;
+    const bExp = b.expiryDate ? new Date(b.expiryDate).getTime() : Infinity;
+    if (aExp !== bExp) return aExp - bExp;
+
+    // Tie-break: older voucher first
+    return new Date(a.dateAdded).getTime() - new Date(b.dateAdded).getTime();
+  });
+}
+
 export function fmtDate(iso: string | null | undefined): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
