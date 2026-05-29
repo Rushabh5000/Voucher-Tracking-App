@@ -12,10 +12,16 @@
     "db:seed": "npm --prefix backend run db:seed",
     "db:studio": "npm --prefix backend run db:studio",
     "build": "npm --prefix frontend run build",
-    "start": "NODE_ENV=production npm --prefix backend run start"
+    "start": "NODE_ENV=production npm --prefix backend run start",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
+    "test:e2e": "playwright test tests/regression.guest.spec.ts",
+    "test": "npm run test:unit && npm run test:e2e"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "@playwright/test": "^1.60.0",
+    "concurrently": "^8.2.2",
+    "vitest": "^4.1.7"
   },
   "dependencies": {
     "playwright": "^1.60.0"
