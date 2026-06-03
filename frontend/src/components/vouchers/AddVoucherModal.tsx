@@ -16,13 +16,6 @@ function today(): string {
   return new Date().toISOString().split("T")[0];
 }
 
-// Returns date +1 month from given YYYY-MM-DD string
-function plusOneMonth(dateStr: string): string {
-  if (!dateStr) return "";
-  const d = new Date(dateStr);
-  d.setMonth(d.getMonth() + 1);
-  return d.toISOString().split("T")[0];
-}
 
 interface FormState {
   voucherCode: string;
@@ -41,7 +34,6 @@ interface FormState {
 }
 
 function blankForm(): FormState {
-  const issueDateStr = today();
   return {
     voucherCode:        "",
     brand:              "",
@@ -49,9 +41,9 @@ function blankForm(): FormState {
     sourceProgramOrCard: "",
     sourceCardId:       "",
     description:        "",
-    issueDate:          issueDateStr,
-    expiryDate:         plusOneMonth(issueDateStr),
-    hasExpiry:          true,
+    issueDate:          today(),
+    expiryDate:         "",
+    hasExpiry:          false,
     emailId:            "",
     cardOwner:          "",
     cardName:           "",
@@ -93,13 +85,8 @@ export function AddVoucherModal({ open, onClose }: AddVoucherModalProps) {
     }));
   }, [cards]);
 
-  // When issue date changes, auto-update expiry to +1 month (if hasExpiry and user hasn't manually edited)
   function handleIssueDateChange(val: string) {
-    setForm((f) => ({
-      ...f,
-      issueDate:  val,
-      expiryDate: f.hasExpiry ? plusOneMonth(val) : f.expiryDate,
-    }));
+    setForm((f) => ({ ...f, issueDate: val }));
   }
 
   function handleExpiryDateChange(val: string) {
@@ -107,11 +94,7 @@ export function AddVoucherModal({ open, onClose }: AddVoucherModalProps) {
   }
 
   function toggleHasExpiry() {
-    setForm((f) => ({
-      ...f,
-      hasExpiry:  !f.hasExpiry,
-      expiryDate: !f.hasExpiry ? plusOneMonth(f.issueDate) : "",
-    }));
+    setForm((f) => ({ ...f, hasExpiry: !f.hasExpiry, expiryDate: "" }));
   }
 
   const upd  = (k: keyof FormState) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
@@ -298,11 +281,6 @@ export function AddVoucherModal({ open, onClose }: AddVoucherModalProps) {
               )}
             </div>
           </div>
-          {form.hasExpiry && form.issueDate && form.expiryDate && (
-            <p className="text-xs text-gray-400 mt-1.5">
-              Auto-set to +1 month from issue date. Change manually if needed.
-            </p>
-          )}
         </div>
 
         {/* ── Description ── */}

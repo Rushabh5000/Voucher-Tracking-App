@@ -79,7 +79,7 @@ export function VoucherCard({ voucher, onView, onEdit }: VoucherCardProps) {
               Edit
             </button>
           )}
-          {voucher.status === "UNREDEEMED" && (
+          {(voucher.status === "UNREDEEMED" || voucher.status === "EXPIRED") && (
             <button className="btn-primary text-xs px-3 py-1.5" onClick={() => redeemVoucher(voucher.id)}>
               Mark redeemed
             </button>
