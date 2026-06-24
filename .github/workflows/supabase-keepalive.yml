@@ -10,16 +10,18 @@ jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
+      - name: Install pg
+        run: npm install pg
+
       - name: Ping database
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
-          npm install -g pg 2>/dev/null || true
-          node - <<'EOF'
-          const { Client } = require('pg');
+          node -e "
+          const { Client } = require('./node_modules/pg');
           const client = new Client({ connectionString: process.env.DATABASE_URL });
           client.connect()
             .then(() => client.query('SELECT 1'))
             .then(() => { console.log('keep-alive ping OK'); return client.end(); })
             .catch(err => { console.error('ping failed:', err.message); process.exit(1); });
-          EOF
+          "
