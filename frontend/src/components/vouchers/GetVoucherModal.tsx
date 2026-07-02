@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { useVoucherStore } from "@/store/voucherStore";
 import type { Voucher } from "@/types";
-import { fmtDate, fmtVal, isExpiringSoon, STATUS_BADGE, STATUS_LABELS } from "@/utils/formatters";
+import { fmtDate, fmtVal, isExpiringSoon, copyToClipboard, STATUS_BADGE, STATUS_LABELS } from "@/utils/formatters";
+import toast from "react-hot-toast";
 
 interface GetVoucherModalProps {
   open: boolean;
@@ -160,13 +161,24 @@ export function GetVoucherModal({ open, onClose }: GetVoucherModalProps) {
                 <span className={STATUS_BADGE[voucher.status]}>{STATUS_LABELS[voucher.status]}</span>
               </div>
 
-              {/* Code display */}
-              <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 text-center">
-                <div className="text-xs text-gray-400 uppercase tracking-wider mb-2">Voucher code</div>
+              {/* Code display — click to copy */}
+              <button
+                type="button"
+                onClick={async () => {
+                  const ok = await copyToClipboard(voucher.voucherCode);
+                  if (ok) toast.success("Code copied to clipboard");
+                  else toast.error("Couldn't copy code");
+                }}
+                title="Click to copy"
+                className="w-full bg-gray-50 dark:bg-gray-800 rounded-xl p-4 text-center hover:bg-accent-50 dark:hover:bg-accent-900/20 transition-colors cursor-pointer group"
+              >
+                <div className="text-xs text-gray-400 uppercase tracking-wider mb-2">
+                  Voucher code <span className="text-accent-500 group-hover:underline">— tap to copy ⧉</span>
+                </div>
                 <div className="font-mono font-bold text-xl text-gray-900 dark:text-gray-100 break-all">
                   {voucher.voucherCode}
                 </div>
-              </div>
+              </button>
 
               {/* Details */}
               <div className="divide-y divide-gray-100 dark:divide-gray-800">

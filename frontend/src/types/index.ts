@@ -17,6 +17,8 @@ export interface Voucher {
   emailId: string;
   cardOwner: string;
   cardName: string;
+  periodType: string;
+  periodKey: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -109,6 +111,7 @@ export type Page =
   | "vouchers"
   | "wordcloud"
   | "cards"
+  | "cardstats"
   | "analytics"
   | "export"
   | "audit"

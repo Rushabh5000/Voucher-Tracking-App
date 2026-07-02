@@ -9,6 +9,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "vouchers",  label: "Vouchers",   icon: "🎫" },
   { id: "wordcloud", label: "Brand Cloud", icon: "☁" },
   { id: "cards",     label: "Cards",      icon: "💳" },
+  { id: "cardstats", label: "Card Stats", icon: "🔁" },
   { id: "analytics", label: "Analytics",  icon: "📊" },
   { id: "export",    label: "Export",     icon: "⬇" },
   { id: "audit",     label: "Audit Log",  icon: "📋" },

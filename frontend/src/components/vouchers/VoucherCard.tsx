@@ -1,8 +1,9 @@
 import type { Voucher } from "@/types";
-import { fmtDate, fmtVal, isExpiringSoon, STATUS_BADGE, STATUS_LABELS } from "@/utils/formatters";
+import { fmtDate, fmtVal, isExpiringSoon, copyToClipboard, STATUS_BADGE, STATUS_LABELS } from "@/utils/formatters";
 import { useVoucherStore } from "@/store/voucherStore";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useState } from "react";
+import toast from "react-hot-toast";
 
 interface VoucherCardProps {
   voucher: Voucher;
@@ -16,6 +17,12 @@ export function VoucherCard({ voucher, onView, onEdit }: VoucherCardProps) {
 
   const soon    = isExpiringSoon(voucher);
   const expired = voucher.status === "EXPIRED";
+
+  async function handleCopyCode() {
+    const ok = await copyToClipboard(voucher.voucherCode);
+    if (ok) toast.success("Code copied to clipboard");
+    else toast.error("Couldn't copy code");
+  }
 
   // Primary display: brand is main heading, title is secondary if present
   const displayTitle = voucher.title || voucher.brand;
@@ -48,9 +55,14 @@ export function VoucherCard({ voucher, onView, onEdit }: VoucherCardProps) {
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-400 dark:text-gray-500 mt-1">
               <span>
                 Code:{" "}
-                <span className="font-mono text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
-                  {voucher.voucherCode}
-                </span>
+                <button
+                  type="button"
+                  onClick={handleCopyCode}
+                  title="Click to copy"
+                  className="font-mono text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded hover:bg-accent-100 dark:hover:bg-accent-900/40 hover:text-accent-700 dark:hover:text-accent-300 transition-colors cursor-pointer"
+                >
+                  {voucher.voucherCode} <span className="opacity-50">⧉</span>
+                </button>
               </span>
               {sourceLabel && <span>Source: {sourceLabel}</span>}
               {voucher.cardOwner && <span>Owner: {voucher.cardOwner}</span>}
