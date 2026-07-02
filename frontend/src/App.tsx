@@ -11,6 +11,7 @@ import { GetVoucherModal }  from "@/components/vouchers/GetVoucherModal";
 import { DashboardPage }  from "@/pages/DashboardPage";
 import { VouchersPage }   from "@/pages/VouchersPage";
 import { CardsPage }      from "@/pages/CardsPage";
+import { CardStatsPage }  from "@/pages/CardStatsPage";
 import { AnalyticsPage }  from "@/pages/AnalyticsPage";
 import { ExportPage }     from "@/pages/ExportPage";
 import { AuditPage }      from "@/pages/AuditPage";
@@ -24,6 +25,7 @@ const PAGE_TITLES: Record<string, { title: string; subtitle?: string }> = {
   vouchers:  { title: "My vouchers", subtitle: "All claimed vouchers, oldest first" },
   wordcloud: { title: "Brand Cloud", subtitle: "Vouchers grouped by brand" },
   cards:     { title: "Cards", subtitle: "Manage your credit and debit cards" },
+  cardstats: { title: "Card Stats", subtitle: "Compare recurring vouchers across cards, spot what's pending" },
   analytics: { title: "Analytics", subtitle: "Charts and trends" },
   export:    { title: "Export", subtitle: "Excel, PDF, and email reports" },
   audit:     { title: "Audit Log", subtitle: "Every API call, recorded" },
@@ -93,6 +95,7 @@ export default function App() {
         {activePage === "vouchers"  && <VouchersPage  onAdd={() => setAddOpen(true)} onGetVoucher={() => setGetOpen(true)} onEdit={(id) => { setEditingVoucherId(id); setEditOpen(true); }} />}
         {activePage === "wordcloud" && <WordCloudPage onEdit={(id) => { setEditingVoucherId(id); setEditOpen(true); }} />}
         {activePage === "cards"     && <CardsPage onEditVoucher={(id) => { setEditingVoucherId(id); setEditOpen(true); }} />}
+        {activePage === "cardstats" && <CardStatsPage />}
         {activePage === "analytics" && <AnalyticsPage />}
         {activePage === "export"    && <ExportPage />}
         {activePage === "audit"     && <AuditPage />}

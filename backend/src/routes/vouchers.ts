@@ -89,13 +89,16 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     const {
       title, voucherCode, brand, sourceProgramOrCard, description,
       expiryDate, issueDate, emailId, cardOwner, cardName,
+      periodType, periodKey,
     } = req.body;
 
     if (!voucherCode?.trim()) throw new AppError(400, "voucherCode is required");
     if (!brand?.trim())       throw new AppError(400, "brand is required");
 
-    const normalizedCode = voucherCode.trim().toLowerCase();
-    const codeHash = hmac(normalizedCode);
+    const trimmedCode = voucherCode.trim();
+    // Stored in capital letters; dedup hash stays case-insensitive (lowercase) for backward compatibility
+    const storedCode  = trimmedCode.toUpperCase();
+    const codeHash    = hmac(trimmedCode.toLowerCase());
 
     // Per-user uniqueness check (admin data: userId IS NULL)
     const dup = await prisma.voucher.findFirst({ where: { voucherCodeHash: codeHash, ...userWhere(req) } });
@@ -105,7 +108,7 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
       data: {
         ...encryptFields({
           title:               (title || "").trim(),
-          voucherCode:         normalizedCode,
+          voucherCode:         storedCode,
           brand:               brand.trim(),
           sourceProgramOrCard: (sourceProgramOrCard || "").trim(),
           description:         (description || "").trim(),
@@ -114,6 +117,8 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
           cardName:            (cardName || "").trim(),
         }),
         voucherCodeHash: codeHash,
+        periodType: (periodType || "").trim(),
+        periodKey:  (periodKey  || "").trim(),
         expiryDate: expiryDate ? new Date(expiryDate) : null,
         issueDate:  issueDate  ? new Date(issueDate)  : new Date(),
         ...userWhere(req),
@@ -130,7 +135,7 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     );
 
     auditWriter(req, startAt)(
-      "Created voucher", "Voucher", voucher.id, `${brand.trim()} | ${normalizedCode}`, 201
+      "Created voucher", "Voucher", voucher.id, `${brand.trim()} | ${storedCode}`, 201
     );
 
     res.status(201).json({ data: formatVoucher(voucher) });
@@ -144,6 +149,7 @@ router.patch("/:id", async (req: Request, res: Response, next: NextFunction) => 
     const {
       title, brand, sourceProgramOrCard, description,
       expiryDate, issueDate, emailId, cardOwner, cardName,
+      periodType, periodKey,
     } = req.body;
 
     const existing = await prisma.voucher.findFirst({ where: { id: req.params.id, ...userWhere(req) } });
@@ -162,6 +168,8 @@ router.patch("/:id", async (req: Request, res: Response, next: NextFunction) => 
           cardOwner:           (cardOwner || "").trim(),
           cardName:            (cardName || "").trim(),
         }),
+        ...(periodType !== undefined ? { periodType: (periodType || "").trim() } : {}),
+        ...(periodKey  !== undefined ? { periodKey:  (periodKey  || "").trim() } : {}),
         expiryDate: expiryDate ? new Date(expiryDate) : null,
         issueDate:  issueDate  ? new Date(issueDate)  : existing.issueDate,
       },

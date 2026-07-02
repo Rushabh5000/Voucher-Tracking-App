@@ -50,6 +50,8 @@ model Voucher {
   emailId             String        @default("")   // encrypted
   cardOwner           String        @default("")   // encrypted
   cardName            String        @default("")   // encrypted
+  periodType          String        @default("")   // "" | "QUARTERLY" | "HALF_YEARLY" | "YEARLY" — for Rupay periodic voucher tracking
+  periodKey           String        @default("")   // e.g. "2026-Q1", "2026-H1", "2026"
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
   userId              String?

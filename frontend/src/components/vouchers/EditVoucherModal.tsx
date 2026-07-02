@@ -3,6 +3,7 @@ import { Modal } from "@/components/ui/Modal";
 import { SmartInput } from "@/components/ui/SmartInput";
 import { useVoucherStore } from "@/store/voucherStore";
 import { CardSelectInput } from "./CardSelectInput";
+import { PeriodSelector } from "./PeriodSelector";
 import { useCardStore } from "@/store/cardStore";
 import type { Card, Voucher } from "@/types";
 
@@ -31,6 +32,8 @@ interface FormState {
   issueDate: string;
   expiryDate: string;
   hasExpiry: boolean;
+  periodType: string;
+  periodKey: string;
   emailId: string;
   cardOwner: string;
   cardName: string;
@@ -51,6 +54,8 @@ function voucherToForm(v: Voucher, cards: Card[]): FormState {
     issueDate:          toDateStr(v.issueDate),
     expiryDate:         toDateStr(v.expiryDate),
     hasExpiry:          !!v.expiryDate,
+    periodType:         v.periodType || "",
+    periodKey:          v.periodKey || "",
     emailId:            v.emailId,
     cardOwner:          v.cardOwner,
     cardName:           v.cardName,
@@ -65,7 +70,7 @@ export function EditVoucherModal({ open, onClose, voucherId }: EditVoucherModalP
   const { vouchers, updateVoucher } = useVoucherStore();
   const { cards } = useCardStore();
 
-  const [form, setForm] = useState<FormState>({ voucherCode: "", brand: "", title: "", sourceProgramOrCard: "", sourceCardId: "", description: "", issueDate: "", expiryDate: "", hasExpiry: false, emailId: "", cardOwner: "", cardName: "" });
+  const [form, setForm] = useState<FormState>({ voucherCode: "", brand: "", title: "", sourceProgramOrCard: "", sourceCardId: "", description: "", issueDate: "", expiryDate: "", hasExpiry: false, periodType: "", periodKey: "", emailId: "", cardOwner: "", cardName: "" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -125,6 +130,8 @@ export function EditVoucherModal({ open, onClose, voucherId }: EditVoucherModalP
         description:         form.description.trim(),
         issueDate:           form.issueDate || undefined,
         expiryDate:          form.hasExpiry && form.expiryDate ? form.expiryDate : undefined,
+        periodType:          form.periodType,
+        periodKey:           form.periodKey,
         emailId:             form.emailId.trim(),
         cardOwner:           form.cardOwner.trim(),
         cardName:            form.cardName.trim(),
@@ -278,6 +285,13 @@ export function EditVoucherModal({ open, onClose, voucherId }: EditVoucherModalP
             </div>
           </div>
         </div>
+
+        {/* ── Recurring benefit period (Rupay) ── */}
+        <PeriodSelector
+          periodType={form.periodType}
+          periodKey={form.periodKey}
+          onChange={(periodType, periodKey) => setForm((f) => ({ ...f, periodType, periodKey }))}
+        />
 
         {/* ── Description ── */}
         <div>

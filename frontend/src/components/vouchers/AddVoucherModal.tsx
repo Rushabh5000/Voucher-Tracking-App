@@ -3,6 +3,7 @@ import { Modal } from "@/components/ui/Modal";
 import { SmartInput } from "@/components/ui/SmartInput";
 import { useVoucherStore } from "@/store/voucherStore";
 import { CardSelectInput } from "./CardSelectInput";
+import { PeriodSelector } from "./PeriodSelector";
 import { useCardStore } from "@/store/cardStore";
 import type { Card } from "@/types";
 
@@ -27,6 +28,9 @@ interface FormState {
   issueDate: string;
   expiryDate: string;
   hasExpiry: boolean;
+  // Rupay periodic tracking
+  periodType: string;
+  periodKey: string;
   // disabled / auto-filled from card
   emailId: string;
   cardOwner: string;
@@ -44,6 +48,8 @@ function blankForm(): FormState {
     issueDate:          today(),
     expiryDate:         "",
     hasExpiry:          false,
+    periodType:         "",
+    periodKey:          "",
     emailId:            "",
     cardOwner:          "",
     cardName:           "",
@@ -121,13 +127,15 @@ export function AddVoucherModal({ open, onClose }: AddVoucherModalProps) {
     setSaving(true);
     try {
       await addVoucher({
-        voucherCode:         form.voucherCode.trim(),
+        voucherCode:         form.voucherCode.trim().toUpperCase(),
         brand:               form.brand.trim(),
         title:               form.title.trim(),
         sourceProgramOrCard: form.sourceProgramOrCard.trim(),
         description:         form.description.trim(),
         issueDate:           form.issueDate || undefined,
         expiryDate:          form.hasExpiry && form.expiryDate ? form.expiryDate : undefined,
+        periodType:          form.periodType,
+        periodKey:           form.periodKey,
         emailId:             form.emailId.trim(),
         cardOwner:           form.cardOwner.trim(),
         cardName:            form.cardName.trim(),
@@ -177,9 +185,9 @@ export function AddVoucherModal({ open, onClose }: AddVoucherModalProps) {
               Voucher code <span className="text-red-500">*</span>
             </label>
             <input
-              className="input font-mono"
+              className="input font-mono uppercase"
               value={form.voucherCode}
-              onChange={updE("voucherCode")}
+              onChange={(e) => setForm((f) => ({ ...f, voucherCode: e.target.value.toUpperCase() }))}
               onBlur={handleVoucherCodeBlur}
               placeholder="e.g. AMZN-HDFC-Q1-2025"
               autoComplete="off"
@@ -282,6 +290,13 @@ export function AddVoucherModal({ open, onClose }: AddVoucherModalProps) {
             </div>
           </div>
         </div>
+
+        {/* ── Recurring benefit period (Rupay) ── */}
+        <PeriodSelector
+          periodType={form.periodType}
+          periodKey={form.periodKey}
+          onChange={(periodType, periodKey) => setForm((f) => ({ ...f, periodType, periodKey }))}
+        />
 
         {/* ── Description ── */}
         <div>
