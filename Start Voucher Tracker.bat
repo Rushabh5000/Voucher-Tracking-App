@@ -1,6 +1,6 @@
 @echo off
 title Voucher Tracker - Dev Server
-cd /d "d:\Voucher Tracker\vt2"
+cd /d "D:\AIProjects\voucher-tracker"
 
 echo ============================================
 echo   Voucher Tracker Startup
