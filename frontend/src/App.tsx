@@ -5,6 +5,7 @@ import { useAuthStore }   from "@/store/authStore";
 import { useVoucherStore } from "@/store/voucherStore";
 import { useCardStore }   from "@/store/cardStore";
 import { Layout }         from "@/components/layout/Layout";
+import { ConnectionGate } from "@/components/layout/ConnectionGate";
 import { AddVoucherModal }  from "@/components/vouchers/AddVoucherModal";
 import { EditVoucherModal } from "@/components/vouchers/EditVoucherModal";
 import { GetVoucherModal }  from "@/components/vouchers/GetVoucherModal";
@@ -35,7 +36,7 @@ const PAGE_TITLES: Record<string, { title: string; subtitle?: string }> = {
 export default function App() {
   const { token, role, guestExpiresAt, logout } = useAuthStore();
   const { activePage } = useUIStore();
-  const { load: loadVouchers } = useVoucherStore();
+  const { load: loadVouchers, loaded, loading, error } = useVoucherStore();
   const { load: loadCards }    = useCardStore();
 
   const [authView, setAuthView] = useState<"login" | "register">("login");
@@ -90,7 +91,11 @@ export default function App() {
 
   return (
     <>
-      <Layout title={meta.title} subtitle={meta.subtitle} actions={pageActions}>
+      <Layout title={meta.title} subtitle={meta.subtitle} actions={loaded ? pageActions : null}>
+        {!loaded ? (
+          <ConnectionGate loading={loading} error={error} onRetry={loadVouchers} />
+        ) : (
+          <>
         {activePage === "dashboard" && <DashboardPage onAddVoucher={() => setAddOpen(true)} onGetVoucher={() => setGetOpen(true)} onEditVoucher={(id) => { setEditingVoucherId(id); setEditOpen(true); }} />}
         {activePage === "vouchers"  && <VouchersPage  onAdd={() => setAddOpen(true)} onGetVoucher={() => setGetOpen(true)} onEdit={(id) => { setEditingVoucherId(id); setEditOpen(true); }} />}
         {activePage === "wordcloud" && <WordCloudPage onEdit={(id) => { setEditingVoucherId(id); setEditOpen(true); }} />}
@@ -100,6 +105,8 @@ export default function App() {
         {activePage === "export"    && <ExportPage />}
         {activePage === "audit"     && <AuditPage />}
         {activePage === "settings"  && <SettingsPage />}
+          </>
+        )}
       </Layout>
 
       <AddVoucherModal open={addOpen} onClose={() => setAddOpen(false)} />
