@@ -6,7 +6,8 @@ import { useAuthStore } from "@/store/authStore";
 // In local dev it's empty and Vite's proxy handles /api → localhost:3001
 export const API_ORIGIN = (import.meta.env.VITE_API_URL as string) || "";
 
-const http = axios.create({ baseURL: `${API_ORIGIN}/api` });
+// 60s timeout: the Render free tier can hold a request open while it wakes from hibernation.
+const http = axios.create({ baseURL: `${API_ORIGIN}/api`, timeout: 60000 });
 
 // Attach JWT to every request
 http.interceptors.request.use((config) => {
@@ -15,11 +16,33 @@ http.interceptors.request.use((config) => {
   return config;
 });
 
-// On 401, clear the token so the app redirects to login
+// On 401, clear the token so the app redirects to login.
+// On cold-start failures (backend hibernating → network error / 502 / 503 / 504),
+// transparently retry idempotent GETs with backoff so real data loads once it wakes,
+// instead of surfacing an error the UI would render as "no data".
+const MAX_RETRIES = 10;
 http.interceptors.response.use(
   (res) => res,
-  (err) => {
-    if (err.response?.status === 401) useAuthStore.getState().logout();
+  async (err) => {
+    if (err.response?.status === 401) {
+      useAuthStore.getState().logout();
+      return Promise.reject(err);
+    }
+
+    const config = err.config;
+    const status = err.response?.status;
+    const method = (config?.method ?? "get").toLowerCase();
+    const transient = !err.response || status === 502 || status === 503 || status === 504;
+
+    if (config && method === "get" && transient) {
+      const attempt = (config as any).__retry ?? 0;
+      if (attempt < MAX_RETRIES) {
+        (config as any).__retry = attempt + 1;
+        const delay = Math.min(5000, 1500 * (attempt + 1)); // ~1.5s → 5s, ~40s total
+        await new Promise((r) => setTimeout(r, delay));
+        return http(config);
+      }
+    }
     return Promise.reject(err);
   }
 );

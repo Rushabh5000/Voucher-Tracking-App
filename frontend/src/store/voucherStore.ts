@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 interface VoucherState {
   vouchers: Voucher[];
   loading: boolean;
+  loaded: boolean;   // true once at least one fetch has succeeded
   error: string | null;
   // Actions
   load: () => Promise<void>;
@@ -22,14 +23,16 @@ interface VoucherState {
 export const useVoucherStore = create<VoucherState>()((set, get) => ({
   vouchers: [],
   loading: false,
+  loaded: false,
   error: null,
 
   load: async () => {
     set({ loading: true, error: null });
     try {
       const vouchers = await voucherApi.list();
-      set({ vouchers, loading: false });
+      set({ vouchers, loading: false, loaded: true });
     } catch (err: any) {
+      // Keep loaded=false so the UI shows a connection error, not a misleading empty state
       set({ error: err.message, loading: false });
     }
   },
