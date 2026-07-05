@@ -11,13 +11,15 @@ interface PeriodSelectorProps {
   periodType: string;
   periodKey: string;
   onChange: (periodType: string, periodKey: string) => void;
+  // When true, the Year picker is hidden and the current year is always used.
+  hideYear?: boolean;
 }
 
 /**
  * Lets the user tag a voucher as a recurring Rupay benefit
  * (quarterly / half-yearly / yearly) so it can be compared across cards.
  */
-export function PeriodSelector({ periodType, periodKey, onChange }: PeriodSelectorProps) {
+export function PeriodSelector({ periodType, periodKey, onChange, hideYear = false }: PeriodSelectorProps) {
   const type = (periodType || "") as PeriodType;
   const parsed = parsePeriodKey(type, periodKey);
   const subOptions = subPeriodOptions(type);
@@ -36,7 +38,9 @@ export function PeriodSelector({ periodType, periodKey, onChange }: PeriodSelect
   }
 
   function handleSubChange(sub: number) {
-    onChange(type, makePeriodKey(type, parsed.year, sub));
+    // With the year hidden we always anchor to the current year
+    const year = hideYear ? curYear : parsed.year;
+    onChange(type, makePeriodKey(type, year, sub));
   }
 
   return (
@@ -66,8 +70,8 @@ export function PeriodSelector({ periodType, periodKey, onChange }: PeriodSelect
           </select>
         </div>
 
-        {/* Year — only when periodic */}
-        {type && (
+        {/* Year — only when periodic and not hidden */}
+        {type && !hideYear && (
           <div>
             <label className="label text-xs">Year</label>
             <select
