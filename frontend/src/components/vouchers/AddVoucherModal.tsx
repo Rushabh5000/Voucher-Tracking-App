@@ -4,6 +4,7 @@ import { SmartInput } from "@/components/ui/SmartInput";
 import { useVoucherStore } from "@/store/voucherStore";
 import { CardSelectInput } from "./CardSelectInput";
 import { PeriodSelector } from "./PeriodSelector";
+import { currentPeriodKey } from "@/utils/periods";
 import { useCardStore } from "@/store/cardStore";
 import type { Card } from "@/types";
 
@@ -48,8 +49,8 @@ function blankForm(): FormState {
     issueDate:          today(),
     expiryDate:         "",
     hasExpiry:          false,
-    periodType:         "",
-    periodKey:          "",
+    periodType:         "QUARTERLY",
+    periodKey:          currentPeriodKey("QUARTERLY"),
     emailId:            "",
     cardOwner:          "",
     cardName:           "",
@@ -296,6 +297,7 @@ export function AddVoucherModal({ open, onClose }: AddVoucherModalProps) {
           periodType={form.periodType}
           periodKey={form.periodKey}
           onChange={(periodType, periodKey) => setForm((f) => ({ ...f, periodType, periodKey }))}
+          hideYear
         />
 
         {/* ── Description ── */}
