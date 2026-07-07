@@ -6,6 +6,7 @@ interface CardSelectInputProps {
   selectedId: string;
   onSelect: (card: Card | null) => void;
   label?: string;
+  required?: boolean;
 }
 
 function cardLabel(card: Card): string {
@@ -16,7 +17,7 @@ function cardDetail(card: Card): string {
   return `${card.cardName}  ·  ${card.accountOwner}`;
 }
 
-export function CardSelectInput({ cards, selectedId, onSelect, label }: CardSelectInputProps) {
+export function CardSelectInput({ cards, selectedId, onSelect, label, required }: CardSelectInputProps) {
   const [query,      setQuery]      = useState("");
   const [open,       setOpen]       = useState(false);
   const [highlighted, setHighlighted] = useState(-1);
@@ -111,7 +112,7 @@ export function CardSelectInput({ cards, selectedId, onSelect, label }: CardSele
 
   return (
     <div ref={containerRef} className="relative">
-      {label && <label className="label">{label}</label>}
+      {label && <label className="label">{label}{required && <span className="text-red-500"> *</span>}</label>}
 
       <div className={`relative flex items-center border rounded-lg transition-colors ${
         open

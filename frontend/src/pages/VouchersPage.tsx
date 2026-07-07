@@ -8,9 +8,10 @@ interface VouchersPageProps {
   onAdd: () => void;
   onGetVoucher: () => void;
   onEdit: (id: string) => void;
+  onView: (id: string) => void;
 }
 
-export function VouchersPage({ onAdd, onGetVoucher, onEdit }: VouchersPageProps) {
+export function VouchersPage({ onAdd, onGetVoucher, onEdit, onView }: VouchersPageProps) {
   const { vouchers, brands } = useVoucherStore();
   const { cards }            = useCardStore();
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -135,7 +136,7 @@ export function VouchersPage({ onAdd, onGetVoucher, onEdit }: VouchersPageProps)
         </div>
       ) : (
         <div className="space-y-3">
-          {filtered.map(v => <VoucherCard key={v.id} voucher={v} onEdit={onEdit} />)}
+          {filtered.map(v => <VoucherCard key={v.id} voucher={v} onView={onView} onEdit={onEdit} />)}
         </div>
       )}
     </div>

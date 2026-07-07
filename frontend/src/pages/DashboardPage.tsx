@@ -7,6 +7,7 @@ interface DashboardPageProps {
   onAddVoucher: () => void;
   onGetVoucher: () => void;
   onEditVoucher: (id: string) => void;
+  onViewVoucher: (id: string) => void;
 }
 
 function StatCard({
@@ -31,13 +32,14 @@ function StatCard({
   );
 }
 
-export function DashboardPage({ onAddVoucher, onGetVoucher, onEditVoucher }: DashboardPageProps) {
+export function DashboardPage({ onAddVoucher, onGetVoucher, onEditVoucher, onViewVoucher }: DashboardPageProps) {
   const { vouchers, brands } = useVoucherStore();
 
   type StatusFilter = "UNREDEEMED" | "REDEEMED" | "EXPIRED" | "EXPIRING_SOON" | "ALL";
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("UNREDEEMED");
   const [brandFilter,  setBrandFilter]  = useState("ALL");
+  const [query,        setQuery]        = useState("");
 
   const now = Date.now();
   const total       = vouchers.length;
@@ -50,25 +52,38 @@ export function DashboardPage({ onAddVoucher, onGetVoucher, onEditVoucher }: Das
     new Date(v.expiryDate).getTime() > now
   ).length;
 
-  // Filtered "oldest first" list
+  const q = query.trim().toLowerCase();
+
+  // Filtered "oldest first" list. A code search looks across ALL statuses so any
+  // voucher can be found by its code regardless of the active status filter.
   const filtered = useMemo(() => {
     let vs = [...vouchers];
-    switch (statusFilter) {
-      case "UNREDEEMED":    vs = vs.filter(v => v.status === "UNREDEEMED"); break;
-      case "REDEEMED":      vs = vs.filter(v => v.status === "REDEEMED"); break;
-      case "EXPIRED":       vs = vs.filter(v => v.status === "EXPIRED"); break;
-      case "EXPIRING_SOON": vs = vs.filter(v =>
-        v.status === "UNREDEEMED" && v.expiryDate &&
-        new Date(v.expiryDate).getTime() - now < 7 * 86400000 &&
-        new Date(v.expiryDate).getTime() > now
-      ); break;
-      // "ALL": no status filter
+    if (!q) {
+      switch (statusFilter) {
+        case "UNREDEEMED":    vs = vs.filter(v => v.status === "UNREDEEMED"); break;
+        case "REDEEMED":      vs = vs.filter(v => v.status === "REDEEMED"); break;
+        case "EXPIRED":       vs = vs.filter(v => v.status === "EXPIRED"); break;
+        case "EXPIRING_SOON": vs = vs.filter(v =>
+          v.status === "UNREDEEMED" && v.expiryDate &&
+          new Date(v.expiryDate).getTime() - now < 7 * 86400000 &&
+          new Date(v.expiryDate).getTime() > now
+        ); break;
+        // "ALL": no status filter
+      }
     }
     if (brandFilter !== "ALL") vs = vs.filter(v => v.brand === brandFilter);
+    if (q) {
+      vs = vs.filter(v =>
+        v.voucherCode.toLowerCase().includes(q) ||
+        v.title.toLowerCase().includes(q) ||
+        v.brand.toLowerCase().includes(q) ||
+        v.sourceProgramOrCard.toLowerCase().includes(q)
+      );
+    }
     return sortVouchers(vs);
-  }, [vouchers, statusFilter, brandFilter, now]);
+  }, [vouchers, statusFilter, brandFilter, now, q]);
 
-  const hasFilters   = statusFilter !== "UNREDEEMED" || brandFilter !== "ALL";
+  const hasFilters   = statusFilter !== "UNREDEEMED" || brandFilter !== "ALL" || !!q;
   const displayCount = filtered.length;
 
   const sel = "text-sm border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-accent-500 focus:outline-none";
@@ -143,10 +158,19 @@ export function DashboardPage({ onAddVoucher, onGetVoucher, onEditVoucher }: Das
             {brands().map(b => <option key={b} value={b}>{b}</option>)}
           </select>
 
+          {/* Search by voucher code (also matches title / brand / source) */}
+          <input
+            className={`${sel} flex-1 min-w-[160px]`}
+            placeholder="Search by voucher code…"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            autoComplete="off"
+          />
+
           {hasFilters && (
             <button
               className="text-xs text-accent-600 dark:text-accent-400 underline"
-              onClick={() => { setStatusFilter("UNREDEEMED"); setBrandFilter("ALL"); }}
+              onClick={() => { setStatusFilter("UNREDEEMED"); setBrandFilter("ALL"); setQuery(""); }}
             >
               Reset
             </button>
@@ -174,7 +198,7 @@ export function DashboardPage({ onAddVoucher, onGetVoucher, onEditVoucher }: Das
           </div>
         ) : (
           <div className="space-y-3">
-            {filtered.map(v => <VoucherCard key={v.id} voucher={v} onEdit={onEditVoucher} />)}
+            {filtered.map(v => <VoucherCard key={v.id} voucher={v} onView={onViewVoucher} onEdit={onEditVoucher} />)}
           </div>
         )}
       </div>
