@@ -9,6 +9,7 @@ import { ConnectionGate } from "@/components/layout/ConnectionGate";
 import { AddVoucherModal }  from "@/components/vouchers/AddVoucherModal";
 import { EditVoucherModal } from "@/components/vouchers/EditVoucherModal";
 import { GetVoucherModal }  from "@/components/vouchers/GetVoucherModal";
+import { VoucherDetailModal } from "@/components/vouchers/VoucherDetailModal";
 import { DashboardPage }  from "@/pages/DashboardPage";
 import { VouchersPage }   from "@/pages/VouchersPage";
 import { CardsPage }      from "@/pages/CardsPage";
@@ -44,6 +45,10 @@ export default function App() {
   const [getOpen, setGetOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editingVoucherId, setEditingVoucherId] = useState<string>("");
+  const [viewOpen, setViewOpen] = useState(false);
+  const [viewingVoucherId, setViewingVoucherId] = useState<string>("");
+  const openView = (id: string) => { setViewingVoucherId(id); setViewOpen(true); };
+  const openEdit = (id: string) => { setEditingVoucherId(id); setEditOpen(true); };
 
   // Apply saved theme on mount
   useEffect(() => {
@@ -96,10 +101,10 @@ export default function App() {
           <ConnectionGate loading={loading} error={error} onRetry={loadVouchers} />
         ) : (
           <>
-        {activePage === "dashboard" && <DashboardPage onAddVoucher={() => setAddOpen(true)} onGetVoucher={() => setGetOpen(true)} onEditVoucher={(id) => { setEditingVoucherId(id); setEditOpen(true); }} />}
-        {activePage === "vouchers"  && <VouchersPage  onAdd={() => setAddOpen(true)} onGetVoucher={() => setGetOpen(true)} onEdit={(id) => { setEditingVoucherId(id); setEditOpen(true); }} />}
-        {activePage === "wordcloud" && <WordCloudPage onEdit={(id) => { setEditingVoucherId(id); setEditOpen(true); }} />}
-        {activePage === "cards"     && <CardsPage onEditVoucher={(id) => { setEditingVoucherId(id); setEditOpen(true); }} />}
+        {activePage === "dashboard" && <DashboardPage onAddVoucher={() => setAddOpen(true)} onGetVoucher={() => setGetOpen(true)} onEditVoucher={openEdit} onViewVoucher={openView} />}
+        {activePage === "vouchers"  && <VouchersPage  onAdd={() => setAddOpen(true)} onGetVoucher={() => setGetOpen(true)} onEdit={openEdit} onView={openView} />}
+        {activePage === "wordcloud" && <WordCloudPage onEdit={openEdit} />}
+        {activePage === "cards"     && <CardsPage onEditVoucher={openEdit} />}
         {activePage === "cardstats" && <CardStatsPage />}
         {activePage === "analytics" && <AnalyticsPage />}
         {activePage === "export"    && <ExportPage />}
@@ -111,6 +116,7 @@ export default function App() {
 
       <AddVoucherModal open={addOpen} onClose={() => setAddOpen(false)} />
       <EditVoucherModal open={editOpen} onClose={() => { setEditOpen(false); setEditingVoucherId(""); }} voucherId={editingVoucherId} />
+      <VoucherDetailModal open={viewOpen} onClose={() => { setViewOpen(false); setViewingVoucherId(""); }} voucherId={viewingVoucherId} onEdit={openEdit} />
       <GetVoucherModal open={getOpen} onClose={() => setGetOpen(false)} />
 
       <Toaster

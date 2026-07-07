@@ -120,6 +120,12 @@ export function AddVoucherModal({ open, onClose }: AddVoucherModalProps) {
   async function handleSubmit() {
     if (!form.voucherCode.trim()) { setError("Voucher code is required."); return; }
     if (!form.brand.trim())       { setError("Brand is required."); return; }
+    if (!form.sourceCardId) {
+      setError(cards.length === 0
+        ? "Please add a card first, then select it as the source card."
+        : "Please select a source card.");
+      return;
+    }
     if (vouchers.some((v) => v.voucherCode.toLowerCase() === form.voucherCode.trim().toLowerCase())) {
       setError("A voucher with this code already exists."); return;
     }
@@ -226,6 +232,7 @@ export function AddVoucherModal({ open, onClose }: AddVoucherModalProps) {
               }
             }}
             label="Source card"
+            required
           />
         </div>
 
