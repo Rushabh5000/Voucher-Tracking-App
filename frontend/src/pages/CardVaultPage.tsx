@@ -8,6 +8,7 @@ import {
   type VaultRow,
   parseWorkbook, downloadWorkbook, supportsFileSystemAccess,
   pickFileToOpen, pickFileToSave, writeToHandle,
+  tryLoadDevVaultFile, saveDevVaultFile,
 } from "@/utils/cardVaultExcel";
 
 // Card Vault: a fully local, Excel-backed store for full card details
@@ -31,7 +32,7 @@ function CopyCell({ value, onCopy, mono }: { value: string; onCopy: () => void; 
 
 export function CardVaultPage() {
   const {
-    rows, fileName, fileHandle, dirty,
+    rows, fileName, fileHandle, devFileActive, dirty,
     loadRows, addRow, updateRow, deleteRow, setHandle, markSaved, closeVault,
   } = useCardVaultStore();
 
@@ -40,6 +41,8 @@ export function CardVaultPage() {
   const [deleteId, setDeleteId]       = useState<string | null>(null);
   const [closeConfirm, setCloseConfirm] = useState(false);
   const [revealed, setRevealed]       = useState<Set<string>>(new Set());
+  const [autoLoadChecked, setAutoLoadChecked] = useState(false);
+  const autoLoadStarted = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Warn before an accidental tab close/refresh discards unsaved edits —
@@ -51,6 +54,21 @@ export function CardVaultPage() {
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [dirty]);
+
+  // On first mount with nothing open yet, try the local-dev CARD_VAULT_PATH
+  // bridge (see vite.config.ts). No-ops instantly if unset or not running the
+  // dev/preview server — the manual screen below is what shows in that case.
+  useEffect(() => {
+    if (autoLoadStarted.current || fileName) return;
+    autoLoadStarted.current = true;
+    tryLoadDevVaultFile().then((result) => {
+      if (result) {
+        loadRows(result.rows, result.fileName, null, true);
+        toast.success(`Auto-loaded ${result.fileName} from CARD_VAULT_PATH`);
+      }
+      setAutoLoadChecked(true);
+    });
+  }, [fileName, loadRows]);
 
   async function handleOpenFile() {
     if (supportsFileSystemAccess) {
@@ -76,6 +94,12 @@ export function CardVaultPage() {
   async function handleSave() {
     if (rows.length === 0) { toast.error("Nothing to save yet"); return; }
     try {
+      if (devFileActive) {
+        const ok = await saveDevVaultFile(rows);
+        if (ok) { markSaved(); toast.success(`Saved directly to ${fileName} (CARD_VAULT_PATH)`); }
+        else toast.error("Couldn't save to CARD_VAULT_PATH");
+        return;
+      }
       if (fileHandle) {
         await writeToHandle(fileHandle, rows);
         markSaved();
@@ -136,7 +160,9 @@ export function CardVaultPage() {
     else closeVault();
   }
 
-  const saveLabel = fileHandle ? "Save" : supportsFileSystemAccess ? "Save to file…" : "Download file";
+  const saveLabel = devFileActive
+    ? "Save"
+    : fileHandle ? "Save" : supportsFileSystemAccess ? "Save to file…" : "Download file";
 
   return (
     <div className="space-y-4">
@@ -158,7 +184,7 @@ export function CardVaultPage() {
         <button className="btn-primary text-sm" onClick={handleSave} disabled={rows.length === 0}>
           💾 {saveLabel}{dirty ? " •" : ""}
         </button>
-        {supportsFileSystemAccess && fileHandle && (
+        {!devFileActive && supportsFileSystemAccess && fileHandle && (
           <button className="btn-secondary text-sm" onClick={handleSaveAs}>Save as…</button>
         )}
         {(rows.length > 0 || fileName) && (
@@ -171,7 +197,12 @@ export function CardVaultPage() {
         <div className="text-xs text-gray-400">
           File: <span className="font-mono">{fileName}</span>
           {dirty && <span className="text-amber-500 ml-2">● Unsaved changes</span>}
-          {supportsFileSystemAccess ? (
+          {devFileActive ? (
+            <span className="ml-2">
+              — auto-loaded from <span className="font-mono">CARD_VAULT_PATH</span>; Save writes
+              straight back to that same file, no dialog needed.
+            </span>
+          ) : supportsFileSystemAccess ? (
             <span className="ml-2">
               — saved to whichever folder you picked in the file dialog; browsers don't let web pages
               show or remember that path, so re-check it in the dialog if unsure.
@@ -186,7 +217,9 @@ export function CardVaultPage() {
       )}
 
       {/* Table */}
-      {rows.length === 0 ? (
+      {!autoLoadChecked ? (
+        <div className="card p-10 text-center text-sm text-gray-400">Checking for a configured vault file…</div>
+      ) : rows.length === 0 ? (
         <div className="card p-10 text-center">
           <div className="text-4xl mb-3">🗄️</div>
           <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">No card vault open</h3>

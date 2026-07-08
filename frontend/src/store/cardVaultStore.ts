@@ -9,8 +9,11 @@ interface CardVaultState {
   rows: VaultRow[];
   fileName: string | null;
   fileHandle: any | null;
+  // True when rows came from the local-dev CARD_VAULT_PATH bridge — Save then
+  // writes straight back to that same path instead of using a file picker.
+  devFileActive: boolean;
   dirty: boolean;
-  loadRows: (rows: VaultRow[], fileName: string, handle: any | null) => void;
+  loadRows: (rows: VaultRow[], fileName: string, handle: any | null, devFileActive?: boolean) => void;
   addRow: (row: VaultRow) => void;
   updateRow: (id: string, patch: Partial<VaultRow>) => void;
   deleteRow: (id: string) => void;
@@ -23,9 +26,11 @@ export const useCardVaultStore = create<CardVaultState>()((set) => ({
   rows: [],
   fileName: null,
   fileHandle: null,
+  devFileActive: false,
   dirty: false,
 
-  loadRows: (rows, fileName, handle) => set({ rows, fileName, fileHandle: handle, dirty: false }),
+  loadRows: (rows, fileName, handle, devFileActive = false) =>
+    set({ rows, fileName, fileHandle: handle, devFileActive, dirty: false }),
 
   addRow: (row) => set((s) => ({ rows: [...s.rows, row], dirty: true })),
 
@@ -36,9 +41,9 @@ export const useCardVaultStore = create<CardVaultState>()((set) => ({
 
   deleteRow: (id) => set((s) => ({ rows: s.rows.filter((r) => r.id !== id), dirty: true })),
 
-  setHandle: (handle, fileName) => set({ fileHandle: handle, fileName }),
+  setHandle: (handle, fileName) => set({ fileHandle: handle, fileName, devFileActive: false }),
 
   markSaved: () => set({ dirty: false }),
 
-  closeVault: () => set({ rows: [], fileName: null, fileHandle: null, dirty: false }),
+  closeVault: () => set({ rows: [], fileName: null, fileHandle: null, devFileActive: false, dirty: false }),
 }));
