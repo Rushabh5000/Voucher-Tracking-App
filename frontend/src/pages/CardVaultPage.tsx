@@ -70,7 +70,7 @@ export function CardVaultPage() {
     if (!file) return;
     const buf = await file.arrayBuffer();
     loadRows(parseWorkbook(buf), file.name, null);
-    toast.success(`Loaded from ${file.name}`);
+    toast.success(`Loaded from ${file.name} — note its folder now; the app can't show it later`);
   }
 
   async function handleSave() {
@@ -79,18 +79,18 @@ export function CardVaultPage() {
       if (fileHandle) {
         await writeToHandle(fileHandle, rows);
         markSaved();
-        toast.success(`Saved to ${fileName}`);
+        toast.success(`Saved to ${fileName} (same folder you opened it from)`);
       } else if (supportsFileSystemAccess) {
         const handle = await pickFileToSave(fileName || "card-vault.xlsx");
         if (!handle) return;
         await writeToHandle(handle, rows);
         setHandle(handle, handle.name ?? fileName ?? "card-vault.xlsx");
         markSaved();
-        toast.success("Saved");
+        toast.success("Saved to the folder you just chose");
       } else {
         downloadWorkbook(rows, fileName || "card-vault.xlsx");
         markSaved();
-        toast.success("Downloaded — replace your original file with this one");
+        toast.success("Downloaded to your browser's Downloads folder — move/replace your original file with this one");
       }
     } catch {
       toast.error("Couldn't save the file");
@@ -105,7 +105,7 @@ export function CardVaultPage() {
       await writeToHandle(handle, rows);
       setHandle(handle, handle.name);
       markSaved();
-      toast.success("Saved");
+      toast.success("Saved to the folder you just chose");
     } catch {
       toast.error("Couldn't save the file");
     }
@@ -171,8 +171,16 @@ export function CardVaultPage() {
         <div className="text-xs text-gray-400">
           File: <span className="font-mono">{fileName}</span>
           {dirty && <span className="text-amber-500 ml-2">● Unsaved changes</span>}
-          {!supportsFileSystemAccess && (
-            <span className="ml-2">— this browser can't edit the file in place; Save downloads a new copy.</span>
+          {supportsFileSystemAccess ? (
+            <span className="ml-2">
+              — saved to whichever folder you picked in the file dialog; browsers don't let web pages
+              show or remember that path, so re-check it in the dialog if unsure.
+            </span>
+          ) : (
+            <span className="ml-2">
+              — this browser can't edit the file in place; Save downloads a new copy to your
+              browser's <strong>Downloads</strong> folder (unless it's set to ask each time).
+            </span>
           )}
         </div>
       )}
