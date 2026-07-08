@@ -19,31 +19,104 @@ import {
 // Column key -> label, in table order. "srNo" is a synthetic key (matched
 // against each row's original 1-based position, so numbering stays stable
 // even while other columns are filtered).
-const FILTER_COLUMNS: { key: string; label: string }[] = [
-  { key: "srNo",       label: "SrNo" },
-  { key: "type",       label: "Type" },
-  { key: "cardType",   label: "Card Type" },
-  { key: "accOwner",   label: "Acc Owner" },
-  { key: "cardName",   label: "Card Name" },
-  { key: "bank",       label: "Bank" },
-  { key: "email",      label: "Email" },
-  { key: "number",     label: "Number" },
-  { key: "cardNumber", label: "Card Number" },
-  { key: "expiry",     label: "Expiry" },
-  { key: "cvv",        label: "CVV" },
+// autocomplete: false for cardNumber/cvv/srNo — a suggestion dropdown would mean
+// showing every raw unmasked card number/CVV the moment you focus the box, which
+// defeats the masking used elsewhere in this table. Everything else gets a local
+// dropdown built purely from values already loaded in memory (no backend).
+const FILTER_COLUMNS: { key: string; label: string; autocomplete: boolean }[] = [
+  { key: "srNo",       label: "SrNo",       autocomplete: false },
+  { key: "type",       label: "Type",       autocomplete: true },
+  { key: "cardType",   label: "Card Type",  autocomplete: true },
+  { key: "accOwner",   label: "Acc Owner",  autocomplete: true },
+  { key: "cardName",   label: "Card Name",  autocomplete: true },
+  { key: "bank",       label: "Bank",       autocomplete: true },
+  { key: "email",      label: "Email",      autocomplete: true },
+  { key: "number",     label: "Number",     autocomplete: true },
+  { key: "cardNumber", label: "Card Number",autocomplete: false },
+  { key: "expiry",     label: "Expiry",     autocomplete: true },
+  { key: "cvv",        label: "CVV",        autocomplete: false },
 ];
+
+const filterInputCls =
+  "w-full min-w-[70px] text-xs px-1.5 py-1 rounded border border-gray-200 dark:border-gray-700 " +
+  "bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 placeholder-gray-300 dark:placeholder-gray-600 " +
+  "focus:ring-1 focus:ring-accent-500 focus:outline-none";
 
 function FilterInput({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) {
   return (
     <input
-      className="w-full min-w-[70px] text-xs px-1.5 py-1 rounded border border-gray-200 dark:border-gray-700
-        bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 placeholder-gray-300 dark:placeholder-gray-600
-        focus:ring-1 focus:ring-accent-500 focus:outline-none"
+      className={filterInputCls}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={`Filter ${label}…`}
       autoComplete="off"
     />
+  );
+}
+
+// Filter box with a local dropdown of distinct values already present in the
+// loaded rows for this column — typed and click-to-pick both narrow the filter.
+function ColumnFilterInput({
+  value, onChange, label, options,
+}: { value: string; onChange: (v: string) => void; label: string; options: string[] }) {
+  const [open, setOpen] = useState(false);
+  const [highlighted, setHighlighted] = useState(-1);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const filtered = value.trim()
+    ? options.filter((o) => o.toLowerCase().includes(value.trim().toLowerCase()))
+    : options;
+
+  function select(v: string) {
+    onChange(v);
+    setOpen(false);
+    setHighlighted(-1);
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (!open) { if (e.key === "ArrowDown") setOpen(true); return; }
+    if (e.key === "ArrowDown") { e.preventDefault(); setHighlighted((h) => Math.min(h + 1, filtered.length - 1)); }
+    if (e.key === "ArrowUp")   { e.preventDefault(); setHighlighted((h) => Math.max(h - 1, 0)); }
+    if (e.key === "Enter" && highlighted >= 0 && filtered[highlighted]) { e.preventDefault(); select(filtered[highlighted]); }
+    if (e.key === "Escape") setOpen(false);
+  }
+
+  return (
+    <div ref={containerRef} className="relative">
+      <input
+        className={filterInputCls}
+        value={value}
+        onChange={(e) => { onChange(e.target.value); setOpen(true); setHighlighted(-1); }}
+        onFocus={() => setOpen(true)}
+        onKeyDown={handleKeyDown}
+        placeholder={`Filter ${label}…`}
+        autoComplete="off"
+      />
+      {open && filtered.length > 0 && (
+        <ul className="absolute z-20 mt-1 w-40 max-h-48 overflow-y-auto bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg text-xs">
+          {filtered.map((o, i) => (
+            <li
+              key={o}
+              onMouseDown={(e) => { e.preventDefault(); select(o); }}
+              title={o}
+              className={`px-2 py-1.5 cursor-pointer truncate ${
+                i === highlighted ? "bg-accent-50 dark:bg-accent-900/30" : "hover:bg-gray-50 dark:hover:bg-gray-800"
+              }`}
+            >
+              {o}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -78,6 +151,18 @@ export function CardVaultPage() {
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const hasFilters = Object.values(filters).some((v) => v.trim());
+
+  // Distinct, non-empty values per autocomplete-enabled column, built purely
+  // from rows already in memory — never fetched, never from the backend.
+  const columnOptions = useMemo(() => {
+    const opts: Record<string, string[]> = {};
+    for (const c of FILTER_COLUMNS) {
+      if (!c.autocomplete) continue;
+      const values = rows.map((r) => String((r as any)[c.key] ?? "").trim()).filter(Boolean);
+      opts[c.key] = Array.from(new Set(values)).sort((a, b) => a.localeCompare(b));
+    }
+    return opts;
+  }, [rows]);
 
   const filteredRows = useMemo(() => {
     const active = Object.entries(filters).filter(([, v]) => v.trim());
@@ -304,7 +389,16 @@ export function CardVaultPage() {
                 <tr className="border-b border-gray-100 dark:border-gray-800">
                   {FILTER_COLUMNS.map((c) => (
                     <th key={c.key} className="px-2 py-1.5">
-                      <FilterInput value={filters[c.key] ?? ""} onChange={(v) => setFilter(c.key, v)} label={c.label} />
+                      {c.autocomplete ? (
+                        <ColumnFilterInput
+                          value={filters[c.key] ?? ""}
+                          onChange={(v) => setFilter(c.key, v)}
+                          label={c.label}
+                          options={columnOptions[c.key] ?? []}
+                        />
+                      ) : (
+                        <FilterInput value={filters[c.key] ?? ""} onChange={(v) => setFilter(c.key, v)} label={c.label} />
+                      )}
                     </th>
                   ))}
                   <th className="px-2 py-1.5" />
