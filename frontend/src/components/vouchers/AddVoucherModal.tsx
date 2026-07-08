@@ -38,10 +38,10 @@ interface FormState {
   cardName: string;
 }
 
-function blankForm(): FormState {
+function blankForm(defaultBrand = ""): FormState {
   return {
     voucherCode:        "",
-    brand:              "",
+    brand:              defaultBrand,
     title:              "",
     sourceProgramOrCard: "",
     sourceCardId:       "",
@@ -70,9 +70,16 @@ export function AddVoucherModal({ open, onClose }: AddVoucherModalProps) {
   const [saving, setSaving] = useState(false);
   const [error,  setError]  = useState("");
 
-  // Reset on open
+  // Reset on open — default Brand to whichever voucher was added most recently,
+  // since it's common to add several vouchers for the same brand back-to-back.
   useEffect(() => {
-    if (open) { setForm(blankForm()); setError(""); }
+    if (open) {
+      const lastAdded = vouchers.reduce<typeof vouchers[number] | null>((latest, v) =>
+        !latest || new Date(v.dateAdded).getTime() > new Date(latest.dateAdded).getTime() ? v : latest
+      , null);
+      setForm(blankForm(lastAdded?.brand ?? ""));
+      setError("");
+    }
   }, [open]);
 
   // When sourceCardId changes, auto-fill disabled fields from the matching card
