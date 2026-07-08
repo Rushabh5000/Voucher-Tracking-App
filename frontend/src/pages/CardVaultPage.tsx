@@ -423,10 +423,10 @@ export function CardVaultPage() {
                       key={r.id}
                       onClick={() => setHighlightedId(r.id)}
                       className={`border-b border-gray-50 dark:border-gray-800/60 last:border-0 cursor-pointer transition-colors ${
-                        isHighlighted ? "bg-accent-50 dark:bg-accent-900/25" : "hover:bg-gray-50 dark:hover:bg-gray-800/40"
+                        isHighlighted ? "bg-accent-100 dark:bg-accent-500/30" : "hover:bg-gray-50 dark:hover:bg-gray-800/40"
                       }`}
                     >
-                      <td className="px-3 py-2.5 text-gray-400">{srNo}</td>
+                      <td className={`px-3 py-2.5 text-gray-400 ${isHighlighted ? "border-l-4 border-accent-500 dark:border-accent-400" : ""}`}>{srNo}</td>
                       <td className="px-3 py-2.5 whitespace-nowrap">{r.type || "—"}</td>
                       <td className="px-3 py-2.5 whitespace-nowrap">{r.cardType || "—"}</td>
                       <td className="px-3 py-2.5 whitespace-nowrap">{r.accOwner || "—"}</td>
