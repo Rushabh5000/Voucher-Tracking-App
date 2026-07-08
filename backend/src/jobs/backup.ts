@@ -3,10 +3,9 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import fs from "fs";
 import path from "path";
-import { PrismaClient } from "@prisma/client";
 
 const execAsync  = promisify(exec);
-const prisma     = new PrismaClient();
+import { prisma } from "../db";
 const PROJECT_ROOT = path.resolve(__dirname, "..", "..", "..");
 
 const SETTING = {

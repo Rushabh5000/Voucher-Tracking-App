@@ -2,11 +2,10 @@ import { Router, Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { promisify } from "util";
-import { PrismaClient } from "@prisma/client";
 import { AppError } from "../middleware/errorHandler";
+import { prisma } from "../db";
 
 const router = Router();
-const prisma = new PrismaClient();
 const scryptAsync = promisify(crypto.scrypt);
 
 async function hashPassword(password: string): Promise<string> {

@@ -1,7 +1,5 @@
-import { PrismaClient } from "@prisma/client";
 import { decrypt } from "./encryptionService";
-
-const prisma = new PrismaClient();
+import { prisma } from "../db";
 
 type VRow = {
   id: string; title: string; voucherCode: string; brand: string;

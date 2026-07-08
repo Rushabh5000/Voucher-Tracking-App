@@ -1,9 +1,7 @@
 import nodemailer from "nodemailer";
 import PDFDocument from "pdfkit";
-import { PrismaClient } from "@prisma/client";
 import { buildAnalytics } from "./analyticsService";
-
-const prisma = new PrismaClient();
+import { prisma } from "../db";
 
 const LAST_SENT_KEY = "monthly_report_last_sent";
 

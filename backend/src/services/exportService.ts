@@ -1,11 +1,10 @@
 import ExcelJS from "exceljs";
 import PDFDocument from "pdfkit";
-import { PrismaClient } from "@prisma/client";
 import { buildAnalytics } from "./analyticsService";
 import { decrypt } from "./encryptionService";
 import { Response } from "express";
 
-const prisma = new PrismaClient();
+import { prisma } from "../db";
 
 const V_ENC = ["voucherCode", "brand", "title", "sourceProgramOrCard", "description", "emailId", "cardOwner", "cardName"] as const;
 const C_ENC = ["accountOwner", "lastFourDigits", "email", "mobileNumber"] as const;

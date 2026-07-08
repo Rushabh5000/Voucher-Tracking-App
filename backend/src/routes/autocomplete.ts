@@ -1,10 +1,9 @@
 import { Router, Request, Response, NextFunction } from "express";
-import { PrismaClient } from "@prisma/client";
 import { upsertAutocomplete, renameValue, deleteEntry } from "../services/autocompleteService";
 import { auditWriter } from "../services/auditService";
+import { prisma } from "../db";
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // GET /all — all entries grouped by field, scoped to the requesting user (for Settings manager)
 router.get("/all", async (req: Request, res: Response, next: NextFunction) => {
