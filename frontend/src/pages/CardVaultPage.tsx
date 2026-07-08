@@ -76,6 +76,7 @@ export function CardVaultPage() {
   const autoLoadStarted = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [filters, setFilters] = useState<Record<string, string>>({});
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const hasFilters = Object.values(filters).some((v) => v.trim());
 
   const filteredRows = useMemo(() => {
@@ -322,8 +323,15 @@ export function CardVaultPage() {
                     ? (isRevealed ? r.cardNumber : "•••• •••• •••• " + r.cardNumber.slice(-4))
                     : "";
                   const maskedCvv = r.cvv ? (isRevealed ? r.cvv : "•".repeat(r.cvv.length)) : "";
+                  const isHighlighted = r.id === highlightedId;
                   return (
-                    <tr key={r.id} className="border-b border-gray-50 dark:border-gray-800/60 last:border-0">
+                    <tr
+                      key={r.id}
+                      onClick={() => setHighlightedId(r.id)}
+                      className={`border-b border-gray-50 dark:border-gray-800/60 last:border-0 cursor-pointer transition-colors ${
+                        isHighlighted ? "bg-accent-50 dark:bg-accent-900/25" : "hover:bg-gray-50 dark:hover:bg-gray-800/40"
+                      }`}
+                    >
                       <td className="px-3 py-2.5 text-gray-400">{srNo}</td>
                       <td className="px-3 py-2.5 whitespace-nowrap">{r.type || "—"}</td>
                       <td className="px-3 py-2.5 whitespace-nowrap">{r.cardType || "—"}</td>
