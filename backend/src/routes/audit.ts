@@ -1,9 +1,8 @@
 import { Router, Request, Response, NextFunction } from "express";
-import { PrismaClient } from "@prisma/client";
 import ExcelJS from "exceljs";
+import { prisma } from "../db";
 
 const router = Router();
-const prisma = new PrismaClient();
 
 function buildWhere(q: Record<string, string>) {
   const where: Record<string, unknown> = {};

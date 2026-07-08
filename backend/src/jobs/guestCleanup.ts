@@ -1,7 +1,5 @@
 import cron from "node-cron";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { prisma } from "../db";
 
 export function startGuestCleanupJob(): void {
   // Run every 30 minutes — delete guests whose session has expired.

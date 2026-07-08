@@ -1,12 +1,11 @@
 import { Router, Request, Response, NextFunction } from "express";
-import { PrismaClient } from "@prisma/client";
 import { AppError } from "../middleware/errorHandler";
 import { upsertAutocomplete } from "../services/autocompleteService";
 import { auditWriter } from "../services/auditService";
 import { encrypt, decrypt, hmac } from "../services/encryptionService";
+import { prisma } from "../db";
 
 const router = Router();
-const prisma = new PrismaClient();
 
 const ENC_FIELDS = ["voucherCode", "brand", "title", "sourceProgramOrCard", "description", "emailId", "cardOwner", "cardName"] as const;
 
