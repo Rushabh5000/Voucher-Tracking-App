@@ -101,14 +101,18 @@ function ColumnFilterInput({
         autoComplete="off"
       />
       {open && filtered.length > 0 && (
-        <ul className="absolute z-20 mt-1 w-40 max-h-48 overflow-y-auto bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg text-xs">
+        // text-left + list-none/m-0/p-1 are required here, not decorative: this
+        // dropdown sits inside a <th>, whose browser-default text-align:center
+        // otherwise inherits straight through (position:absolute doesn't break
+        // CSS inheritance), centering every option and making it look broken.
+        <ul className="absolute z-20 mt-1 w-40 max-h-48 overflow-y-auto list-none m-0 p-1 text-left bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg text-xs">
           {filtered.map((o, i) => (
             <li
               key={o}
               onMouseDown={(e) => { e.preventDefault(); select(o); }}
               title={o}
-              className={`px-2 py-1.5 cursor-pointer truncate ${
-                i === highlighted ? "bg-accent-50 dark:bg-accent-900/30" : "hover:bg-gray-50 dark:hover:bg-gray-800"
+              className={`text-left px-2 py-1.5 rounded cursor-pointer truncate ${
+                i === highlighted ? "bg-accent-100 dark:bg-accent-500/30" : "hover:bg-gray-50 dark:hover:bg-gray-800"
               }`}
             >
               {o}
