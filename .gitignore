@@ -2,3 +2,5 @@ node_modules
 backend/.env
 backend/migrate.js
 test-results/**
+frontend/.env.local
+frontend/.env*.local

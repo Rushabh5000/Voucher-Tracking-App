@@ -1,8 +1,11 @@
 // Card Vault: local-only Excel read/write helpers (SheetJS).
 //
-// IMPORTANT: nothing in this file ever calls fetch/axios or touches the backend.
-// All parsing/writing happens entirely in the browser, against a file the user
-// explicitly opens/saves on their own machine. Do not add any network calls here.
+// IMPORTANT: nothing in this file ever imports the app's API client
+// (voucherApi/cardApi/axios) or sends data to the backend/DB/internet. The one
+// exception is the dev-file bridge at the bottom, which only ever talks to a
+// fixed same-origin, localhost-only route the Vite dev/preview server exposes
+// (see vite.config.ts) — it doesn't exist in the deployed production build, so
+// it can't run against the hosted site. Do not add any other network calls here.
 import * as XLSX from "xlsx";
 
 export interface VaultRow {
@@ -126,4 +129,34 @@ export async function writeToHandle(handle: any, rows: VaultRow[]): Promise<void
   const writable = await handle.createWritable();
   await writable.write(workbookToArrayBuffer(rows));
   await writable.close();
+}
+
+// ── Local-dev auto-file bridge ──────────────────────────────────────────
+// Talks only to the fixed same-origin route the Vite dev/preview server
+// exposes when CARD_VAULT_PATH is set (see vite.config.ts). That route reads
+// and writes ONE fixed path configured server-side — never a client-supplied
+// path — and simply doesn't exist in the static production build, so this is
+// a no-op (404/network error) on the deployed Vercel site.
+const DEV_VAULT_ROUTE = "/__card-vault-file";
+
+export async function tryLoadDevVaultFile(): Promise<{ rows: VaultRow[]; fileName: string } | null> {
+  try {
+    const res = await fetch(DEV_VAULT_ROUTE, { method: "GET" });
+    if (!res.ok) return null;
+    const buf = await res.arrayBuffer();
+    const encodedName = res.headers.get("X-Card-Vault-Filename");
+    const fileName = encodedName ? decodeURIComponent(encodedName) : "card-vault.xlsx";
+    return { rows: parseWorkbook(buf), fileName };
+  } catch {
+    return null;
+  }
+}
+
+export async function saveDevVaultFile(rows: VaultRow[]): Promise<boolean> {
+  try {
+    const res = await fetch(DEV_VAULT_ROUTE, { method: "PUT", body: workbookToArrayBuffer(rows) });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
