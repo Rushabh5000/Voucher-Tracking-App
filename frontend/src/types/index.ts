@@ -111,6 +111,7 @@ export type Page =
   | "vouchers"
   | "wordcloud"
   | "cards"
+  | "cardvault"
   | "cardstats"
   | "analytics"
   | "export"
