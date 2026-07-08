@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { Toaster } from "react-hot-toast";
 import { useUIStore }     from "@/store/uiStore";
 import { useAuthStore }   from "@/store/authStore";
@@ -14,6 +14,12 @@ import { DashboardPage }  from "@/pages/DashboardPage";
 import { VouchersPage }   from "@/pages/VouchersPage";
 import { CardsPage }      from "@/pages/CardsPage";
 import { CardStatsPage }  from "@/pages/CardStatsPage";
+
+// Lazy-loaded: pulls in the `xlsx` library (~350KB gzipped), so it's kept out
+// of the main bundle and only fetched when the user opens Card Vault.
+const CardVaultPage = lazy(() =>
+  import("@/pages/CardVaultPage").then((m) => ({ default: m.CardVaultPage }))
+);
 import { AnalyticsPage }  from "@/pages/AnalyticsPage";
 import { ExportPage }     from "@/pages/ExportPage";
 import { AuditPage }      from "@/pages/AuditPage";
@@ -26,7 +32,8 @@ const PAGE_TITLES: Record<string, { title: string; subtitle?: string }> = {
   dashboard: { title: "Dashboard", subtitle: "Your voucher overview" },
   vouchers:  { title: "My vouchers", subtitle: "All claimed vouchers, oldest first" },
   wordcloud: { title: "Brand Cloud", subtitle: "Vouchers grouped by brand" },
-  cards:     { title: "Cards", subtitle: "Manage your credit and debit cards" },
+  cards:     { title: "Cards Summary", subtitle: "Manage your credit and debit cards" },
+  cardvault: { title: "Card Vault", subtitle: "Full card details, stored only in your local Excel file — never online" },
   cardstats: { title: "Card Stats", subtitle: "Compare recurring vouchers across cards, spot what's pending" },
   analytics: { title: "Analytics", subtitle: "Charts and trends" },
   export:    { title: "Export", subtitle: "Excel, PDF, and email reports" },
@@ -96,8 +103,14 @@ export default function App() {
 
   return (
     <>
-      <Layout title={meta.title} subtitle={meta.subtitle} actions={loaded ? pageActions : null}>
-        {!loaded ? (
+      <Layout title={meta.title} subtitle={meta.subtitle} actions={loaded || activePage === "cardvault" ? pageActions : null}>
+        {activePage === "cardvault" ? (
+          // Card Vault is fully offline — it must never wait on (or be blocked by)
+          // backend voucher/card loading.
+          <Suspense fallback={<div className="card p-10 text-center text-sm text-gray-400">Loading Card Vault…</div>}>
+            <CardVaultPage />
+          </Suspense>
+        ) : !loaded ? (
           <ConnectionGate loading={loading} error={error} onRetry={loadVouchers} />
         ) : (
           <>
