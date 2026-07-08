@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import toast from "react-hot-toast";
 import { useCardVaultStore } from "@/store/cardVaultStore";
 import { CardVaultRowModal } from "@/components/cardvault/CardVaultRowModal";
@@ -15,6 +15,37 @@ import {
 // (including card number + CVV). This page must NEVER import api/client.ts,
 // any Zustand store backed by the backend, or otherwise make a network call —
 // see cardVaultExcel.ts and cardVaultStore.ts for the enforced boundary.
+
+// Column key -> label, in table order. "srNo" is a synthetic key (matched
+// against each row's original 1-based position, so numbering stays stable
+// even while other columns are filtered).
+const FILTER_COLUMNS: { key: string; label: string }[] = [
+  { key: "srNo",       label: "SrNo" },
+  { key: "type",       label: "Type" },
+  { key: "cardType",   label: "Card Type" },
+  { key: "accOwner",   label: "Acc Owner" },
+  { key: "cardName",   label: "Card Name" },
+  { key: "bank",       label: "Bank" },
+  { key: "email",      label: "Email" },
+  { key: "number",     label: "Number" },
+  { key: "cardNumber", label: "Card Number" },
+  { key: "expiry",     label: "Expiry" },
+  { key: "cvv",        label: "CVV" },
+];
+
+function FilterInput({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) {
+  return (
+    <input
+      className="w-full min-w-[70px] text-xs px-1.5 py-1 rounded border border-gray-200 dark:border-gray-700
+        bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 placeholder-gray-300 dark:placeholder-gray-600
+        focus:ring-1 focus:ring-accent-500 focus:outline-none"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={`Filter ${label}…`}
+      autoComplete="off"
+    />
+  );
+}
 
 function CopyCell({ value, onCopy, mono }: { value: string; onCopy: () => void; mono?: boolean }) {
   if (!value) return <span className="text-gray-300 dark:text-gray-600">—</span>;
@@ -44,6 +75,27 @@ export function CardVaultPage() {
   const [autoLoadChecked, setAutoLoadChecked] = useState(false);
   const autoLoadStarted = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [filters, setFilters] = useState<Record<string, string>>({});
+  const hasFilters = Object.values(filters).some((v) => v.trim());
+
+  const filteredRows = useMemo(() => {
+    const active = Object.entries(filters).filter(([, v]) => v.trim());
+    if (active.length === 0) return rows.map((r, i) => ({ row: r, srNo: i + 1 }));
+    return rows
+      .map((r, i) => ({ row: r, srNo: i + 1 }))
+      .filter(({ row, srNo }) =>
+        active.every(([key, raw]) => {
+          const q = raw.trim().toLowerCase();
+          if (key === "srNo") return String(srNo).includes(q);
+          const val = String((row as any)[key] ?? "").toLowerCase();
+          return val.includes(q);
+        })
+      );
+  }, [rows, filters]);
+
+  function setFilter(key: string, value: string) {
+    setFilters((f) => ({ ...f, [key]: value }));
+  }
 
   // Warn before an accidental tab close/refresh discards unsaved edits —
   // there is no auto-save and no DB backup for this data.
@@ -233,26 +285,38 @@ export function CardVaultPage() {
         </div>
       ) : (
         <div className="card overflow-hidden">
+          {hasFilters && (
+            <div className="flex items-center justify-between px-3 py-1.5 text-xs text-gray-400 border-b border-gray-100 dark:border-gray-800">
+              <span>{filteredRows.length} of {rows.length} card{rows.length !== 1 ? "s" : ""} match</span>
+              <button className="text-accent-600 dark:text-accent-400 underline" onClick={() => setFilters({})}>Clear filters</button>
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="text-left text-xs text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-800">
-                  <th className="px-3 py-2 font-medium">SrNo</th>
-                  <th className="px-3 py-2 font-medium">Type</th>
-                  <th className="px-3 py-2 font-medium">Card Type</th>
-                  <th className="px-3 py-2 font-medium">Acc Owner</th>
-                  <th className="px-3 py-2 font-medium">Card Name</th>
-                  <th className="px-3 py-2 font-medium">Bank</th>
-                  <th className="px-3 py-2 font-medium">Email</th>
-                  <th className="px-3 py-2 font-medium">Number</th>
-                  <th className="px-3 py-2 font-medium">Card Number</th>
-                  <th className="px-3 py-2 font-medium">Expiry</th>
-                  <th className="px-3 py-2 font-medium">CVV</th>
+                  {FILTER_COLUMNS.map((c) => (
+                    <th key={c.key} className="px-3 py-2 font-medium whitespace-nowrap">{c.label}</th>
+                  ))}
                   <th className="px-3 py-2 font-medium">Actions</th>
+                </tr>
+                <tr className="border-b border-gray-100 dark:border-gray-800">
+                  {FILTER_COLUMNS.map((c) => (
+                    <th key={c.key} className="px-2 py-1.5">
+                      <FilterInput value={filters[c.key] ?? ""} onChange={(v) => setFilter(c.key, v)} label={c.label} />
+                    </th>
+                  ))}
+                  <th className="px-2 py-1.5" />
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r, i) => {
+                {filteredRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={FILTER_COLUMNS.length + 1} className="px-3 py-6 text-center text-sm text-gray-400">
+                      No cards match your filters.
+                    </td>
+                  </tr>
+                ) : filteredRows.map(({ row: r, srNo }) => {
                   const isRevealed = revealed.has(r.id);
                   const maskedCardNumber = r.cardNumber
                     ? (isRevealed ? r.cardNumber : "•••• •••• •••• " + r.cardNumber.slice(-4))
@@ -260,7 +324,7 @@ export function CardVaultPage() {
                   const maskedCvv = r.cvv ? (isRevealed ? r.cvv : "•".repeat(r.cvv.length)) : "";
                   return (
                     <tr key={r.id} className="border-b border-gray-50 dark:border-gray-800/60 last:border-0">
-                      <td className="px-3 py-2.5 text-gray-400">{i + 1}</td>
+                      <td className="px-3 py-2.5 text-gray-400">{srNo}</td>
                       <td className="px-3 py-2.5 whitespace-nowrap">{r.type || "—"}</td>
                       <td className="px-3 py-2.5 whitespace-nowrap">{r.cardType || "—"}</td>
                       <td className="px-3 py-2.5 whitespace-nowrap">{r.accOwner || "—"}</td>
