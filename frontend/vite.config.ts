@@ -2,9 +2,28 @@ import { defineConfig, loadEnv, type Plugin, type ViteDevServer, type PreviewSer
 import react from "@vitejs/plugin-react";
 import path from "path";
 import fs from "fs/promises";
+import { execFile } from "child_process";
 import type { IncomingMessage, ServerResponse } from "http";
 
 const CARD_VAULT_ROUTE = "/__card-vault-file";
+const CARD_VAULT_OPEN_ROUTE = "/__card-vault-open";
+
+// Opens vaultPath in the OS's default handler for .xlsx (Desktop Excel, if
+// that's what's installed/associated) — same local-machine-only bridge as
+// the file route below, just launching an app instead of reading bytes.
+// Uses execFile (array args, no shell string interpolation) to avoid
+// shell-injection even though vaultPath only ever comes from a trusted
+// local .env.local, never from a request.
+function openInDefaultApp(vaultPath: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const [cmd, args] = process.platform === "win32"
+      ? ["cmd", ["/c", "start", "", vaultPath]]
+      : process.platform === "darwin"
+      ? ["open", [vaultPath]]
+      : ["xdg-open", [vaultPath]];
+    execFile(cmd, args, (err) => (err ? reject(err) : resolve()));
+  });
+}
 
 // Local-dev-only bridge for Card Vault: when CARD_VAULT_PATH is set (in
 // frontend/.env.local, gitignored — never commit a real path), the browser
@@ -15,6 +34,19 @@ const CARD_VAULT_ROUTE = "/__card-vault-file";
 // Open/Add screen.
 function cardVaultFilePlugin(vaultPath: string | undefined): Plugin {
   async function handler(req: IncomingMessage, res: ServerResponse, next: () => void) {
+    if (req.url === CARD_VAULT_OPEN_ROUTE && req.method === "POST") {
+      if (!vaultPath) { res.statusCode = 404; res.end(); return; }
+      try {
+        await openInDefaultApp(vaultPath);
+        res.statusCode = 204;
+        res.end();
+      } catch {
+        res.statusCode = 500;
+        res.end();
+      }
+      return;
+    }
+
     if (req.url !== CARD_VAULT_ROUTE) { next(); return; }
     if (!vaultPath) { res.statusCode = 404; res.end(); return; }
 

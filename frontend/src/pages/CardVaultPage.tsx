@@ -5,10 +5,10 @@ import { CardVaultRowModal } from "@/components/cardvault/CardVaultRowModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { copyToClipboard } from "@/utils/formatters";
 import {
-  type VaultRow, DEFAULT_COLUMNS, isSensitiveColumn,
+  DEFAULT_COLUMNS, isSensitiveColumn,
   parseWorkbook, downloadWorkbook, supportsFileSystemAccess,
   pickFileToOpen, pickFileToSave, writeToHandle,
-  tryLoadDevVaultFile, saveDevVaultFile,
+  tryLoadDevVaultFile, saveDevVaultFile, openDevVaultFileInDesktopApp,
 } from "@/utils/cardVaultExcel";
 
 // Card Vault: a fully local, Excel-backed store for full card details
@@ -126,12 +126,10 @@ function CopyCell({ value, onCopy, mono }: { value: string; onCopy: () => void; 
 export function CardVaultPage() {
   const {
     columns, rows, fileName, fileHandle, devFileActive, dirty,
-    loadRows, ensureColumns, addRow, updateRow, deleteRow, setHandle, markSaved, closeVault,
+    loadRows, ensureColumns, addRow, setHandle, markSaved, closeVault,
   } = useCardVaultStore();
 
   const [modalOpen, setModalOpen]     = useState(false);
-  const [editingRow, setEditingRow]   = useState<VaultRow | null>(null);
-  const [deleteId, setDeleteId]       = useState<string | null>(null);
   const [closeConfirm, setCloseConfirm] = useState(false);
   const [revealed, setRevealed]       = useState<Set<string>>(new Set());
   const [autoLoadChecked, setAutoLoadChecked] = useState(false);
@@ -261,14 +259,17 @@ export function CardVaultPage() {
 
   function openAddModal() {
     if (columns.length === 0) ensureColumns(DEFAULT_COLUMNS);
-    setEditingRow(null);
     setModalOpen(true);
   }
 
   function handleModalSave(values: Record<string, string>) {
-    if (editingRow) updateRow(editingRow.id, values);
-    else addRow({ id: crypto.randomUUID(), values });
-    setEditingRow(null);
+    addRow({ id: crypto.randomUUID(), values });
+  }
+
+  async function handleOpenInExcel() {
+    const ok = await openDevVaultFileInDesktopApp();
+    if (ok) toast.success("Opening in your desktop Excel app…");
+    else toast.error("Couldn't open the file — is it still at CARD_VAULT_PATH?");
   }
 
   async function handleCopy(label: string, value: string) {
@@ -318,35 +319,14 @@ export function CardVaultPage() {
         {!devFileActive && supportsFileSystemAccess && fileHandle && (
           <button className="btn-secondary text-sm" onClick={handleSaveAs}>Save as…</button>
         )}
+        {devFileActive && (
+          <button className="btn-secondary text-sm" onClick={handleOpenInExcel}>📊 Open in Excel</button>
+        )}
         {(rows.length > 0 || fileName) && (
           <button className="text-xs text-gray-400 hover:text-red-500 ml-auto" onClick={requestClose}>✕ Close vault</button>
         )}
         <input ref={fileInputRef} type="file" accept=".xlsx" className="hidden" onChange={handleFileInputChange} />
       </div>
-
-      {fileName && (
-        <div className="text-xs text-gray-400">
-          File: <span className="font-mono">{fileName}</span>
-          <span className="ml-2">({columns.length} column{columns.length !== 1 ? "s" : ""})</span>
-          {dirty && <span className="text-amber-500 ml-2">● Unsaved changes</span>}
-          {devFileActive ? (
-            <span className="ml-2">
-              — auto-loaded from <span className="font-mono">CARD_VAULT_PATH</span>; Save writes
-              straight back to that same file, no dialog needed.
-            </span>
-          ) : supportsFileSystemAccess ? (
-            <span className="ml-2">
-              — saved to whichever folder you picked in the file dialog; browsers don't let web pages
-              show or remember that path, so re-check it in the dialog if unsure.
-            </span>
-          ) : (
-            <span className="ml-2">
-              — this browser can't edit the file in place; Save downloads a new copy to your
-              browser's <strong>Downloads</strong> folder (unless it's set to ask each time).
-            </span>
-          )}
-        </div>
-      )}
 
       {/* Table */}
       {!autoLoadChecked ? (
@@ -379,7 +359,6 @@ export function CardVaultPage() {
                   {columns.map((col) => (
                     <th key={col} className="px-3 py-2 font-medium whitespace-nowrap">{col}</th>
                   ))}
-                  <th className="px-3 py-2 font-medium">Actions</th>
                 </tr>
                 <tr className="border-b border-gray-100 dark:border-gray-800">
                   <th className="px-2 py-1.5" />
@@ -400,13 +379,12 @@ export function CardVaultPage() {
                       </th>
                     );
                   })}
-                  <th className="px-2 py-1.5" />
                 </tr>
               </thead>
               <tbody>
                 {filteredRows.length === 0 ? (
                   <tr>
-                    <td colSpan={columns.length + 2} className="px-3 py-6 text-center text-sm text-gray-400">
+                    <td colSpan={columns.length + 1} className="px-3 py-6 text-center text-sm text-gray-400">
                       No cards match your filters.
                     </td>
                   </tr>
@@ -453,10 +431,6 @@ export function CardVaultPage() {
                           </td>
                         );
                       })}
-                      <td className="px-3 py-2.5 whitespace-nowrap">
-                        <button className="btn-secondary text-xs px-2 py-1 mr-1" onClick={() => { setEditingRow(r); setModalOpen(true); }}>Edit</button>
-                        <button className="btn-danger text-xs px-2 py-1" onClick={() => setDeleteId(r.id)}>Delete</button>
-                      </td>
                     </tr>
                   );
                 })}
@@ -468,19 +442,9 @@ export function CardVaultPage() {
 
       <CardVaultRowModal
         open={modalOpen}
-        onClose={() => { setModalOpen(false); setEditingRow(null); }}
+        onClose={() => setModalOpen(false)}
         onSave={handleModalSave}
         columns={columns}
-        existing={editingRow}
-      />
-
-      <ConfirmDialog
-        open={!!deleteId}
-        title="Delete card?"
-        message="Remove this card from the vault. This won't affect the file on disk until you save."
-        confirmLabel="Yes, delete"
-        onConfirm={() => { if (deleteId) deleteRow(deleteId); setDeleteId(null); }}
-        onCancel={() => setDeleteId(null)}
       />
 
       <ConfirmDialog
