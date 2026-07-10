@@ -6,92 +6,77 @@
 // fixed same-origin, localhost-only route the Vite dev/preview server exposes
 // (see vite.config.ts) — it doesn't exist in the deployed production build, so
 // it can't run against the hosted site. Do not add any other network calls here.
+//
+// Columns are fully dynamic: whatever header row the opened .xlsx has is
+// exactly what's shown/edited/saved. Add or remove a column in Excel and the
+// vault picks it up next time it's opened — there is no fixed schema.
 import * as XLSX from "xlsx";
 
 export interface VaultRow {
-  id: string; // client-only key, never written to the sheet
-  type: string;
-  cardType: string;
-  accOwner: string;
-  cardName: string;
-  bank: string;
-  email: string;
-  number: string;
-  cardNumber: string;
-  expiry: string;
-  cvv: string;
+  id: string;                     // client-only key, never written to the sheet
+  values: Record<string, string>; // column name -> value
 }
 
-type FieldKey = Exclude<keyof VaultRow, "id">;
-
-const HEADER_ALIASES: Record<FieldKey, string[]> = {
-  type:       ["Type"],
-  cardType:   ["Card Type", "CardType"],
-  accOwner:   ["Acc Owner", "Account Owner", "AccOwner"],
-  cardName:   ["Card Name", "CardName"],
-  bank:       ["Bank"],
-  email:      ["Email"],
-  number:     ["Number", "Mobile", "Mobile Number"],
-  cardNumber: ["Card Number", "CardNumber"],
-  expiry:     ["Expiry", "Expiry Date"],
-  cvv:        ["CVV"],
-};
-
-function pick(row: Record<string, unknown>, aliases: string[]): string {
-  const keys = Object.keys(row);
-  for (const alias of aliases) {
-    const key = keys.find((k) => k.trim().toLowerCase() === alias.toLowerCase());
-    if (key !== undefined && row[key] != null) return String(row[key]).trim();
-  }
-  return "";
+export interface ParsedVault {
+  columns: string[];
+  rows: VaultRow[];
 }
 
-export function parseWorkbook(buf: ArrayBuffer): VaultRow[] {
+// Starting schema for a brand-new vault (no file opened yet). Purely a
+// convenience default — add/remove/rename freely, nothing is fixed.
+export const DEFAULT_COLUMNS = [
+  "Type", "Card Type", "Acc Owner", "Card Name", "Bank",
+  "Email", "Number", "Card Number", "Expiry", "CVV",
+];
+
+// Column-name heuristic for sensitive fields (masked in the table by default,
+// no autocomplete dropdown offered). Matched case-insensitively so it still
+// works if the user renames/reorders columns in Excel.
+export function isSensitiveColumn(column: string): boolean {
+  const n = column.trim().toLowerCase();
+  return n === "cvv" || n.includes("card number") || n.includes("cardnumber") || n === "pin" || n.includes("password");
+}
+
+export function blankRow(columns: string[]): VaultRow {
+  return { id: crypto.randomUUID(), values: Object.fromEntries(columns.map((c) => [c, ""])) };
+}
+
+export function parseWorkbook(buf: ArrayBuffer): ParsedVault {
   const wb = XLSX.read(buf, { type: "array" });
   const sheetName = wb.SheetNames[0];
-  if (!sheetName) return [];
-  const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[sheetName], { defval: "" });
-  return json.map((row) => ({
+  if (!sheetName) return { columns: [], rows: [] };
+
+  // header:1 gives raw arrays-of-arrays, preserving the exact column order —
+  // object mode doesn't guarantee that once headers repeat/reorder oddly.
+  const raw = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[sheetName], { header: 1, defval: "", blankrows: false });
+  const headerRow = (raw[0] ?? []).map((h) => String(h ?? "").trim());
+  const cols = headerRow
+    .map((h, i) => ({ h, i }))
+    .filter((x) => x.h);
+  const columns = cols.map((c) => c.h);
+
+  const rows: VaultRow[] = raw.slice(1).map((r) => ({
     id: crypto.randomUUID(),
-    type:       pick(row, HEADER_ALIASES.type),
-    cardType:   pick(row, HEADER_ALIASES.cardType),
-    accOwner:   pick(row, HEADER_ALIASES.accOwner),
-    cardName:   pick(row, HEADER_ALIASES.cardName),
-    bank:       pick(row, HEADER_ALIASES.bank),
-    email:      pick(row, HEADER_ALIASES.email),
-    number:     pick(row, HEADER_ALIASES.number),
-    cardNumber: pick(row, HEADER_ALIASES.cardNumber),
-    expiry:     pick(row, HEADER_ALIASES.expiry),
-    cvv:        pick(row, HEADER_ALIASES.cvv),
+    values: Object.fromEntries(cols.map(({ h, i }) => [h, String((r as unknown[])[i] ?? "").trim()])),
   }));
+
+  return { columns, rows };
 }
 
-function buildWorkbook(rows: VaultRow[]): XLSX.WorkBook {
-  const data = rows.map((r, i) => ({
-    SrNo: i + 1,
-    Type: r.type,
-    "Card Type": r.cardType,
-    "Acc Owner": r.accOwner,
-    "Card Name": r.cardName,
-    Bank: r.bank,
-    Email: r.email,
-    Number: r.number,
-    "Card Number": r.cardNumber,
-    Expiry: r.expiry,
-    CVV: r.cvv,
-  }));
-  const ws = XLSX.utils.json_to_sheet(data);
+function buildWorkbook(columns: string[], rows: VaultRow[]): XLSX.WorkBook {
+  const data = rows.map((r) => Object.fromEntries(columns.map((c) => [c, r.values[c] ?? ""])));
+  const ws = XLSX.utils.json_to_sheet(data, { header: columns });
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Cards");
   return wb;
 }
 
-function workbookToArrayBuffer(rows: VaultRow[]): ArrayBuffer {
-  return XLSX.write(buildWorkbook(rows), { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+function workbookToArrayBuffer(columns: string[], rows: VaultRow[]): ArrayBuffer {
+  return XLSX.write(buildWorkbook(columns, rows), { type: "array", bookType: "xlsx" }) as ArrayBuffer;
 }
 
-export function downloadWorkbook(rows: VaultRow[], fileName: string): void {
-  XLSX.writeFile(buildWorkbook(rows), fileName);
+export function downloadWorkbook(columns: string[], rows: VaultRow[], fileName: string): void {
+  XLSX.writeFile(buildWorkbook(columns, rows), fileName);
 }
 
 // File System Access API lets us edit the user's chosen file in place.
@@ -125,9 +110,9 @@ export async function pickFileToSave(suggestedName: string): Promise<any | null>
   }
 }
 
-export async function writeToHandle(handle: any, rows: VaultRow[]): Promise<void> {
+export async function writeToHandle(handle: any, columns: string[], rows: VaultRow[]): Promise<void> {
   const writable = await handle.createWritable();
-  await writable.write(workbookToArrayBuffer(rows));
+  await writable.write(workbookToArrayBuffer(columns, rows));
   await writable.close();
 }
 
@@ -139,22 +124,22 @@ export async function writeToHandle(handle: any, rows: VaultRow[]): Promise<void
 // a no-op (404/network error) on the deployed Vercel site.
 const DEV_VAULT_ROUTE = "/__card-vault-file";
 
-export async function tryLoadDevVaultFile(): Promise<{ rows: VaultRow[]; fileName: string } | null> {
+export async function tryLoadDevVaultFile(): Promise<(ParsedVault & { fileName: string }) | null> {
   try {
     const res = await fetch(DEV_VAULT_ROUTE, { method: "GET" });
     if (!res.ok) return null;
     const buf = await res.arrayBuffer();
     const encodedName = res.headers.get("X-Card-Vault-Filename");
     const fileName = encodedName ? decodeURIComponent(encodedName) : "card-vault.xlsx";
-    return { rows: parseWorkbook(buf), fileName };
+    return { ...parseWorkbook(buf), fileName };
   } catch {
     return null;
   }
 }
 
-export async function saveDevVaultFile(rows: VaultRow[]): Promise<boolean> {
+export async function saveDevVaultFile(columns: string[], rows: VaultRow[]): Promise<boolean> {
   try {
-    const res = await fetch(DEV_VAULT_ROUTE, { method: "PUT", body: workbookToArrayBuffer(rows) });
+    const res = await fetch(DEV_VAULT_ROUTE, { method: "PUT", body: workbookToArrayBuffer(columns, rows) });
     return res.ok;
   } catch {
     return false;
