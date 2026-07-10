@@ -145,3 +145,16 @@ export async function saveDevVaultFile(columns: string[], rows: VaultRow[]): Pro
     return false;
   }
 }
+
+// Opens the CARD_VAULT_PATH file in its OS-default app (Desktop Excel, if
+// that's the installed handler for .xlsx). Only meaningful in the auto-loaded
+// dev-file mode: the browser file picker (File System Access API) never
+// exposes a real filesystem path, so there's nothing to launch in that case.
+export async function openDevVaultFileInDesktopApp(): Promise<boolean> {
+  try {
+    const res = await fetch("/__card-vault-open", { method: "POST" });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
