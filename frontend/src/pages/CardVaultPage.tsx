@@ -5,7 +5,7 @@ import { CardVaultRowModal } from "@/components/cardvault/CardVaultRowModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { copyToClipboard } from "@/utils/formatters";
 import {
-  type VaultRow,
+  type VaultRow, DEFAULT_COLUMNS, isSensitiveColumn,
   parseWorkbook, downloadWorkbook, supportsFileSystemAccess,
   pickFileToOpen, pickFileToSave, writeToHandle,
   tryLoadDevVaultFile, saveDevVaultFile,
@@ -15,27 +15,12 @@ import {
 // (including card number + CVV). This page must NEVER import api/client.ts,
 // any Zustand store backed by the backend, or otherwise make a network call —
 // see cardVaultExcel.ts and cardVaultStore.ts for the enforced boundary.
-
-// Column key -> label, in table order. "srNo" is a synthetic key (matched
-// against each row's original 1-based position, so numbering stays stable
-// even while other columns are filtered).
-// autocomplete: false for cardNumber/cvv/srNo — a suggestion dropdown would mean
-// showing every raw unmasked card number/CVV the moment you focus the box, which
-// defeats the masking used elsewhere in this table. Everything else gets a local
-// dropdown built purely from values already loaded in memory (no backend).
-const FILTER_COLUMNS: { key: string; label: string; autocomplete: boolean }[] = [
-  { key: "srNo",       label: "SrNo",       autocomplete: false },
-  { key: "type",       label: "Type",       autocomplete: true },
-  { key: "cardType",   label: "Card Type",  autocomplete: true },
-  { key: "accOwner",   label: "Acc Owner",  autocomplete: true },
-  { key: "cardName",   label: "Card Name",  autocomplete: true },
-  { key: "bank",       label: "Bank",       autocomplete: true },
-  { key: "email",      label: "Email",      autocomplete: true },
-  { key: "number",     label: "Number",     autocomplete: true },
-  { key: "cardNumber", label: "Card Number",autocomplete: false },
-  { key: "expiry",     label: "Expiry",     autocomplete: true },
-  { key: "cvv",        label: "CVV",        autocomplete: false },
-];
+//
+// Columns are fully dynamic — driven entirely by the opened file's header
+// row (store.columns). Add/remove a column in Excel and reopen: the table,
+// filters, and Add/Edit form all follow automatically. "sensitive" columns
+// (card number/cvv/pin/password, matched by name) get masking + no
+// autocomplete dropdown; everything else gets a copy button + local dropdown.
 
 const filterInputCls =
   "w-full min-w-[70px] text-xs px-1.5 py-1 rounded border border-gray-200 dark:border-gray-700 " +
@@ -140,8 +125,8 @@ function CopyCell({ value, onCopy, mono }: { value: string; onCopy: () => void; 
 
 export function CardVaultPage() {
   const {
-    rows, fileName, fileHandle, devFileActive, dirty,
-    loadRows, addRow, updateRow, deleteRow, setHandle, markSaved, closeVault,
+    columns, rows, fileName, fileHandle, devFileActive, dirty,
+    loadRows, ensureColumns, addRow, updateRow, deleteRow, setHandle, markSaved, closeVault,
   } = useCardVaultStore();
 
   const [modalOpen, setModalOpen]     = useState(false);
@@ -156,35 +141,30 @@ export function CardVaultPage() {
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const hasFilters = Object.values(filters).some((v) => v.trim());
 
-  // Distinct, non-empty values per autocomplete-enabled column, built purely
-  // from rows already in memory — never fetched, never from the backend.
+  // Distinct, non-empty values per non-sensitive column, built purely from
+  // rows already in memory — never fetched, never from the backend.
   const columnOptions = useMemo(() => {
     const opts: Record<string, string[]> = {};
-    for (const c of FILTER_COLUMNS) {
-      if (!c.autocomplete) continue;
-      const values = rows.map((r) => String((r as any)[c.key] ?? "").trim()).filter(Boolean);
-      opts[c.key] = Array.from(new Set(values)).sort((a, b) => a.localeCompare(b));
+    for (const col of columns) {
+      if (isSensitiveColumn(col)) continue;
+      const values = rows.map((r) => (r.values[col] ?? "").trim()).filter(Boolean);
+      opts[col] = Array.from(new Set(values)).sort((a, b) => a.localeCompare(b));
     }
     return opts;
-  }, [rows]);
+  }, [rows, columns]);
 
   const filteredRows = useMemo(() => {
     const active = Object.entries(filters).filter(([, v]) => v.trim());
-    if (active.length === 0) return rows.map((r, i) => ({ row: r, srNo: i + 1 }));
+    if (active.length === 0) return rows.map((r, i) => ({ row: r, pos: i + 1 }));
     return rows
-      .map((r, i) => ({ row: r, srNo: i + 1 }))
-      .filter(({ row, srNo }) =>
-        active.every(([key, raw]) => {
-          const q = raw.trim().toLowerCase();
-          if (key === "srNo") return String(srNo).includes(q);
-          const val = String((row as any)[key] ?? "").toLowerCase();
-          return val.includes(q);
-        })
+      .map((r, i) => ({ row: r, pos: i + 1 }))
+      .filter(({ row }) =>
+        active.every(([col, raw]) => (row.values[col] ?? "").toLowerCase().includes(raw.trim().toLowerCase()))
       );
   }, [rows, filters]);
 
-  function setFilter(key: string, value: string) {
-    setFilters((f) => ({ ...f, [key]: value }));
+  function setFilter(col: string, value: string) {
+    setFilters((f) => ({ ...f, [col]: value }));
   }
 
   // Warn before an accidental tab close/refresh discards unsaved edits —
@@ -205,7 +185,7 @@ export function CardVaultPage() {
     autoLoadStarted.current = true;
     tryLoadDevVaultFile().then((result) => {
       if (result) {
-        loadRows(result.rows, result.fileName, null, true);
+        loadRows(result.columns, result.rows, result.fileName, null, true);
         toast.success(`Auto-loaded ${result.fileName} from CARD_VAULT_PATH`);
       }
       setAutoLoadChecked(true);
@@ -217,8 +197,9 @@ export function CardVaultPage() {
       const picked = await pickFileToOpen();
       if (!picked) return;
       const buf = await picked.file.arrayBuffer();
-      loadRows(parseWorkbook(buf), picked.file.name, picked.handle);
-      toast.success(`Loaded from ${picked.file.name}`);
+      const parsed = parseWorkbook(buf);
+      loadRows(parsed.columns, parsed.rows, picked.file.name, picked.handle);
+      toast.success(`Loaded from ${picked.file.name} (${parsed.columns.length} column${parsed.columns.length !== 1 ? "s" : ""})`);
     } else {
       fileInputRef.current?.click();
     }
@@ -229,7 +210,8 @@ export function CardVaultPage() {
     e.target.value = "";
     if (!file) return;
     const buf = await file.arrayBuffer();
-    loadRows(parseWorkbook(buf), file.name, null);
+    const parsed = parseWorkbook(buf);
+    loadRows(parsed.columns, parsed.rows, file.name, null);
     toast.success(`Loaded from ${file.name} — note its folder now; the app can't show it later`);
   }
 
@@ -237,24 +219,24 @@ export function CardVaultPage() {
     if (rows.length === 0) { toast.error("Nothing to save yet"); return; }
     try {
       if (devFileActive) {
-        const ok = await saveDevVaultFile(rows);
+        const ok = await saveDevVaultFile(columns, rows);
         if (ok) { markSaved(); toast.success(`Saved directly to ${fileName} (CARD_VAULT_PATH)`); }
         else toast.error("Couldn't save to CARD_VAULT_PATH");
         return;
       }
       if (fileHandle) {
-        await writeToHandle(fileHandle, rows);
+        await writeToHandle(fileHandle, columns, rows);
         markSaved();
         toast.success(`Saved to ${fileName} (same folder you opened it from)`);
       } else if (supportsFileSystemAccess) {
         const handle = await pickFileToSave(fileName || "card-vault.xlsx");
         if (!handle) return;
-        await writeToHandle(handle, rows);
+        await writeToHandle(handle, columns, rows);
         setHandle(handle, handle.name ?? fileName ?? "card-vault.xlsx");
         markSaved();
         toast.success("Saved to the folder you just chose");
       } else {
-        downloadWorkbook(rows, fileName || "card-vault.xlsx");
+        downloadWorkbook(columns, rows, fileName || "card-vault.xlsx");
         markSaved();
         toast.success("Downloaded to your browser's Downloads folder — move/replace your original file with this one");
       }
@@ -268,7 +250,7 @@ export function CardVaultPage() {
     const handle = await pickFileToSave(fileName || "card-vault.xlsx");
     if (!handle) return;
     try {
-      await writeToHandle(handle, rows);
+      await writeToHandle(handle, columns, rows);
       setHandle(handle, handle.name);
       markSaved();
       toast.success("Saved to the folder you just chose");
@@ -277,9 +259,15 @@ export function CardVaultPage() {
     }
   }
 
-  function handleModalSave(data: Omit<VaultRow, "id">) {
-    if (editingRow) updateRow(editingRow.id, data);
-    else addRow({ id: crypto.randomUUID(), ...data });
+  function openAddModal() {
+    if (columns.length === 0) ensureColumns(DEFAULT_COLUMNS);
+    setEditingRow(null);
+    setModalOpen(true);
+  }
+
+  function handleModalSave(values: Record<string, string>) {
+    if (editingRow) updateRow(editingRow.id, values);
+    else addRow({ id: crypto.randomUUID(), values });
     setEditingRow(null);
   }
 
@@ -315,14 +303,15 @@ export function CardVaultPage() {
           <strong>Offline only.</strong> This vault never sends data to any server or database —
           everything lives only in this browser tab and in the Excel file you open/save on your own
           computer. Refreshing or closing the tab clears it from memory; nothing is kept unless you
-          explicitly save it to a file.
+          explicitly save it to a file. Columns exactly mirror the opened file's header row — add or
+          remove a column in Excel and reopen to see it reflected here.
         </p>
       </div>
 
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
         <button className="btn-secondary text-sm" onClick={handleOpenFile}>📂 Open Excel file…</button>
-        <button className="btn-secondary text-sm" onClick={() => { setEditingRow(null); setModalOpen(true); }}>+ Add card</button>
+        <button className="btn-secondary text-sm" onClick={openAddModal}>+ Add card</button>
         <button className="btn-primary text-sm" onClick={handleSave} disabled={rows.length === 0}>
           💾 {saveLabel}{dirty ? " •" : ""}
         </button>
@@ -338,6 +327,7 @@ export function CardVaultPage() {
       {fileName && (
         <div className="text-xs text-gray-400">
           File: <span className="font-mono">{fileName}</span>
+          <span className="ml-2">({columns.length} column{columns.length !== 1 ? "s" : ""})</span>
           {dirty && <span className="text-amber-500 ml-2">● Unsaved changes</span>}
           {devFileActive ? (
             <span className="ml-2">
@@ -370,7 +360,7 @@ export function CardVaultPage() {
           </p>
           <div className="flex justify-center gap-2">
             <button className="btn-secondary text-sm" onClick={handleOpenFile}>📂 Open Excel file…</button>
-            <button className="btn-primary text-sm" onClick={() => { setEditingRow(null); setModalOpen(true); }}>+ Add card</button>
+            <button className="btn-primary text-sm" onClick={openAddModal}>+ Add card</button>
           </div>
         </div>
       ) : (
@@ -385,42 +375,43 @@ export function CardVaultPage() {
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="text-left text-xs text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-800">
-                  {FILTER_COLUMNS.map((c) => (
-                    <th key={c.key} className="px-3 py-2 font-medium whitespace-nowrap">{c.label}</th>
+                  <th className="px-3 py-2 font-medium">#</th>
+                  {columns.map((col) => (
+                    <th key={col} className="px-3 py-2 font-medium whitespace-nowrap">{col}</th>
                   ))}
                   <th className="px-3 py-2 font-medium">Actions</th>
                 </tr>
                 <tr className="border-b border-gray-100 dark:border-gray-800">
-                  {FILTER_COLUMNS.map((c) => (
-                    <th key={c.key} className="px-2 py-1.5">
-                      {c.autocomplete ? (
-                        <ColumnFilterInput
-                          value={filters[c.key] ?? ""}
-                          onChange={(v) => setFilter(c.key, v)}
-                          label={c.label}
-                          options={columnOptions[c.key] ?? []}
-                        />
-                      ) : (
-                        <FilterInput value={filters[c.key] ?? ""} onChange={(v) => setFilter(c.key, v)} label={c.label} />
-                      )}
-                    </th>
-                  ))}
+                  <th className="px-2 py-1.5" />
+                  {columns.map((col) => {
+                    const sensitive = isSensitiveColumn(col);
+                    return (
+                      <th key={col} className="px-2 py-1.5">
+                        {sensitive ? (
+                          <FilterInput value={filters[col] ?? ""} onChange={(v) => setFilter(col, v)} label={col} />
+                        ) : (
+                          <ColumnFilterInput
+                            value={filters[col] ?? ""}
+                            onChange={(v) => setFilter(col, v)}
+                            label={col}
+                            options={columnOptions[col] ?? []}
+                          />
+                        )}
+                      </th>
+                    );
+                  })}
                   <th className="px-2 py-1.5" />
                 </tr>
               </thead>
               <tbody>
                 {filteredRows.length === 0 ? (
                   <tr>
-                    <td colSpan={FILTER_COLUMNS.length + 1} className="px-3 py-6 text-center text-sm text-gray-400">
+                    <td colSpan={columns.length + 2} className="px-3 py-6 text-center text-sm text-gray-400">
                       No cards match your filters.
                     </td>
                   </tr>
-                ) : filteredRows.map(({ row: r, srNo }) => {
+                ) : filteredRows.map(({ row: r, pos }) => {
                   const isRevealed = revealed.has(r.id);
-                  const maskedCardNumber = r.cardNumber
-                    ? (isRevealed ? r.cardNumber : "•••• •••• •••• " + r.cardNumber.slice(-4))
-                    : "";
-                  const maskedCvv = r.cvv ? (isRevealed ? r.cvv : "•".repeat(r.cvv.length)) : "";
                   const isHighlighted = r.id === highlightedId;
                   return (
                     <tr
@@ -430,38 +421,38 @@ export function CardVaultPage() {
                         isHighlighted ? "bg-accent-100 dark:bg-accent-500/30" : "hover:bg-gray-50 dark:hover:bg-gray-800/40"
                       }`}
                     >
-                      <td className={`px-3 py-2.5 text-gray-400 ${isHighlighted ? "border-l-4 border-accent-500 dark:border-accent-400" : ""}`}>{srNo}</td>
-                      <td className="px-3 py-2.5 whitespace-nowrap">{r.type || "—"}</td>
-                      <td className="px-3 py-2.5 whitespace-nowrap">{r.cardType || "—"}</td>
-                      <td className="px-3 py-2.5 whitespace-nowrap">{r.accOwner || "—"}</td>
-                      <td className="px-3 py-2.5 whitespace-nowrap">{r.cardName || "—"}</td>
-                      <td className="px-3 py-2.5 whitespace-nowrap">{r.bank || "—"}</td>
-                      <td className="px-3 py-2.5">
-                        <CopyCell value={r.email} onCopy={() => handleCopy("Email", r.email)} />
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <CopyCell value={r.number} onCopy={() => handleCopy("Number", r.number)} />
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <div className="flex items-center gap-1.5">
-                          <CopyCell value={maskedCardNumber} mono onCopy={() => handleCopy("Card number", r.cardNumber)} />
-                          {r.cardNumber && (
-                            <button
-                              className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 flex-shrink-0"
-                              onClick={() => toggleReveal(r.id)}
-                              title={isRevealed ? "Hide" : "Reveal"}
-                            >
-                              {isRevealed ? "🙈" : "👁"}
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <CopyCell value={r.expiry} mono onCopy={() => handleCopy("Expiry", r.expiry)} />
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <CopyCell value={maskedCvv} mono onCopy={() => handleCopy("CVV", r.cvv)} />
-                      </td>
+                      <td className={`px-3 py-2.5 text-gray-400 ${isHighlighted ? "border-l-4 border-accent-500 dark:border-accent-400" : ""}`}>{pos}</td>
+                      {columns.map((col) => {
+                        const raw = r.values[col] ?? "";
+                        if (isSensitiveColumn(col)) {
+                          const masked = raw
+                            ? (isRevealed
+                                ? raw
+                                : col.toLowerCase().includes("card") ? "•••• •••• •••• " + raw.slice(-4) : "•".repeat(raw.length))
+                            : "";
+                          return (
+                            <td key={col} className="px-3 py-2.5">
+                              <div className="flex items-center gap-1.5">
+                                <CopyCell value={masked} mono onCopy={() => handleCopy(col, raw)} />
+                                {raw && (
+                                  <button
+                                    className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 flex-shrink-0"
+                                    onClick={() => toggleReveal(r.id)}
+                                    title={isRevealed ? "Hide" : "Reveal"}
+                                  >
+                                    {isRevealed ? "🙈" : "👁"}
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          );
+                        }
+                        return (
+                          <td key={col} className="px-3 py-2.5">
+                            <CopyCell value={raw} onCopy={() => handleCopy(col, raw)} />
+                          </td>
+                        );
+                      })}
                       <td className="px-3 py-2.5 whitespace-nowrap">
                         <button className="btn-secondary text-xs px-2 py-1 mr-1" onClick={() => { setEditingRow(r); setModalOpen(true); }}>Edit</button>
                         <button className="btn-danger text-xs px-2 py-1" onClick={() => setDeleteId(r.id)}>Delete</button>
@@ -479,6 +470,7 @@ export function CardVaultPage() {
         open={modalOpen}
         onClose={() => { setModalOpen(false); setEditingRow(null); }}
         onSave={handleModalSave}
+        columns={columns}
         existing={editingRow}
       />
 

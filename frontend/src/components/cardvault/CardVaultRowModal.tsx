@@ -1,40 +1,36 @@
 import { useState, useEffect } from "react";
 import { Modal } from "@/components/ui/Modal";
-import type { VaultRow } from "@/utils/cardVaultExcel";
-
-type FormState = Omit<VaultRow, "id">;
+import { isSensitiveColumn, type VaultRow } from "@/utils/cardVaultExcel";
 
 interface CardVaultRowModalProps {
   open: boolean;
   onClose: () => void;
-  onSave: (data: FormState) => void;
+  onSave: (values: Record<string, string>) => void;
+  columns: string[];
   existing?: VaultRow | null;
 }
 
-const blank: FormState = {
-  type: "", cardType: "", accOwner: "", cardName: "", bank: "",
-  email: "", number: "", cardNumber: "", expiry: "", cvv: "",
-};
-
-// Every field here is a plain input — never SmartInput, which calls the
+// Renders one plain input per column — never SmartInput, which calls the
 // backend autocomplete API. This vault must make zero network requests.
-export function CardVaultRowModal({ open, onClose, onSave, existing }: CardVaultRowModalProps) {
-  const [form, setForm]   = useState<FormState>(blank);
+// Fields are fully dynamic: whatever columns the vault currently has (driven
+// by the opened Excel file) is exactly what's editable here.
+export function CardVaultRowModal({ open, onClose, onSave, columns, existing }: CardVaultRowModalProps) {
+  const [form, setForm]   = useState<Record<string, string>>({});
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (open) {
-      setForm(existing ? { ...existing } : blank);
+      setForm(Object.fromEntries(columns.map((c) => [c, existing?.values[c] ?? ""])));
       setError("");
     }
-  }, [open, existing]);
+  }, [open, existing, columns]);
 
-  const upd = (k: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm((f) => ({ ...f, [k]: e.target.value }));
+  const upd = (col: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm((f) => ({ ...f, [col]: e.target.value }));
 
   function handleSubmit() {
-    if (!form.cardName.trim() && !form.cardNumber.trim()) {
-      setError("Enter at least a card name or card number.");
+    if (columns.length > 0 && columns.every((c) => !form[c]?.trim())) {
+      setError("Enter at least one field.");
       return;
     }
     setError("");
@@ -56,73 +52,28 @@ export function CardVaultRowModal({ open, onClose, onSave, existing }: CardVault
       }
     >
       <div className="space-y-4">
+        {columns.length === 0 && (
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            This vault has no columns yet — open an Excel file with a header row, or add columns first.
+          </p>
+        )}
         <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="label">Type</label>
-            <input className="input" value={form.type} onChange={upd("type")} placeholder="Credit / Debit" autoComplete="off" />
-          </div>
-          <div>
-            <label className="label">Card type</label>
-            <input className="input" value={form.cardType} onChange={upd("cardType")} placeholder="e.g. Rupay Select" autoComplete="off" />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="label">Account owner</label>
-            <input className="input" value={form.accOwner} onChange={upd("accOwner")} placeholder="e.g. Rushabh Shah" autoComplete="off" />
-          </div>
-          <div>
-            <label className="label">Card name</label>
-            <input className="input" value={form.cardName} onChange={upd("cardName")} placeholder="e.g. HDFC Millennia" autoComplete="off" />
-          </div>
-        </div>
-
-        <div>
-          <label className="label">Bank</label>
-          <input className="input" value={form.bank} onChange={upd("bank")} placeholder="e.g. HDFC Bank" autoComplete="off" />
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="label">Email</label>
-            <input className="input" value={form.email} onChange={upd("email")} placeholder="your@email.com" autoComplete="off" />
-          </div>
-          <div>
-            <label className="label">Number (mobile)</label>
-            <input className="input" value={form.number} onChange={upd("number")} placeholder="9876543210" autoComplete="off" />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-4">
-          <div className="col-span-2">
-            <label className="label">Card number</label>
-            <input
-              className="input font-mono tracking-wider"
-              value={form.cardNumber}
-              onChange={upd("cardNumber")}
-              placeholder="XXXX XXXX XXXX XXXX"
-              inputMode="numeric"
-              autoComplete="off"
-            />
-          </div>
-          <div>
-            <label className="label">Expiry</label>
-            <input className="input font-mono" value={form.expiry} onChange={upd("expiry")} placeholder="MM/YY" autoComplete="off" />
-          </div>
-        </div>
-
-        <div className="w-32">
-          <label className="label">CVV</label>
-          <input
-            className="input font-mono"
-            value={form.cvv}
-            onChange={upd("cvv")}
-            placeholder="123"
-            inputMode="numeric"
-            maxLength={4}
-            autoComplete="off"
-          />
+          {columns.map((col) => {
+            const sensitive = isSensitiveColumn(col);
+            return (
+              <div key={col}>
+                <label className="label">{col}</label>
+                <input
+                  className={`input ${sensitive ? "font-mono" : ""}`}
+                  value={form[col] ?? ""}
+                  onChange={upd(col)}
+                  placeholder={col}
+                  autoComplete="off"
+                  inputMode={sensitive ? "numeric" : undefined}
+                />
+              </div>
+            );
+          })}
         </div>
 
         {error && (
