@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import toast from "react-hot-toast";
 import { Modal } from "@/components/ui/Modal";
 import { SmartInput } from "@/components/ui/SmartInput";
 import { useVoucherStore } from "@/store/voucherStore";
@@ -72,7 +73,13 @@ export function EditVoucherModal({ open, onClose, voucherId }: EditVoucherModalP
 
   const [form, setForm] = useState<FormState>({ voucherCode: "", brand: "", title: "", sourceProgramOrCard: "", sourceCardId: "", description: "", issueDate: "", expiryDate: "", hasExpiry: false, periodType: "", periodKey: "", emailId: "", cardOwner: "", cardName: "" });
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setErrorState] = useState("");
+  // Every validation/API error also surfaces as a toast (top-right) — the
+  // inline box alone was easy to miss since it sits at the bottom of the form.
+  function setError(msg: string) {
+    setErrorState(msg);
+    if (msg) toast.error(msg);
+  }
 
   const voucher = voucherId ? vouchers.find((v) => v.id === voucherId) : null;
 
