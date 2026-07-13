@@ -1,4 +1,5 @@
 import { useState, FormEvent } from "react";
+import toast from "react-hot-toast";
 import { useAuthStore } from "@/store/authStore";
 import { authApi } from "@/api/client";
 
@@ -11,8 +12,13 @@ export function LoginPage({ onShowRegister }: Props) {
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [error,    setError]    = useState("");
+  const [error,    setErrorState] = useState("");
   const [loading,  setLoading]  = useState(false);
+  // Every error also surfaces as a toast (top-right) so it's impossible to miss.
+  function setError(msg: string) {
+    setErrorState(msg);
+    if (msg) toast.error(msg);
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();

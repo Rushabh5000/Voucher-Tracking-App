@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import toast from "react-hot-toast";
 import { Modal } from "@/components/ui/Modal";
 import { SmartInput } from "@/components/ui/SmartInput";
 import { useCardStore } from "@/store/cardStore";
@@ -24,7 +25,13 @@ export function CardModal({ open, onClose, existing }: CardModalProps) {
   const { addCard, updateCard } = useCardStore();
   const [form,   setForm]   = useState<CardFormData>(blank);
   const [saving, setSaving] = useState(false);
-  const [error,  setError]  = useState("");
+  const [error,  setErrorState] = useState("");
+  // Every validation/API error also surfaces as a toast (top-right) — the
+  // inline box alone was easy to miss since it sits at the bottom of the form.
+  function setError(msg: string) {
+    setErrorState(msg);
+    if (msg) toast.error(msg);
+  }
 
   useEffect(() => {
     if (open) {

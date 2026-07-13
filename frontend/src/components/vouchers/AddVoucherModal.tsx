@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import toast from "react-hot-toast";
 import { Modal } from "@/components/ui/Modal";
 import { SmartInput } from "@/components/ui/SmartInput";
 import { useVoucherStore } from "@/store/voucherStore";
@@ -68,7 +69,13 @@ export function AddVoucherModal({ open, onClose }: AddVoucherModalProps) {
 
   const [form,   setForm]   = useState<FormState>(blankForm);
   const [saving, setSaving] = useState(false);
-  const [error,  setError]  = useState("");
+  const [error,  setErrorState] = useState("");
+  // Every validation/API error also surfaces as a toast (top-right) — the
+  // inline box alone was easy to miss since it sits at the bottom of the form.
+  function setError(msg: string) {
+    setErrorState(msg);
+    if (msg) toast.error(msg);
+  }
 
   // Reset on open — default Brand to whichever voucher was added most recently,
   // since it's common to add several vouchers for the same brand back-to-back.

@@ -84,11 +84,30 @@ export default function App() {
     return () => clearTimeout(id);
   }, [guestExpiresAt, role]);
 
+  const toaster = (
+    <Toaster
+      position="top-right"
+      toastOptions={{
+        duration: 3000,
+        style: {
+          background: "var(--toast-bg, #fff)",
+          color: "#1A1816",
+          borderRadius: "10px",
+          border: "1px solid #E2DFD8",
+          fontSize: "13px",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
+        },
+      }}
+    />
+  );
+
   if (!token) {
+    // Mount the Toaster here too — Login/Register errors need somewhere to
+    // render; without this, toast.error() calls before login are silently lost.
     if (authView === "register") {
-      return <RegisterPage onShowLogin={() => setAuthView("login")} />;
+      return <><RegisterPage onShowLogin={() => setAuthView("login")} />{toaster}</>;
     }
-    return <LoginPage onShowRegister={() => setAuthView("register")} />;
+    return <><LoginPage onShowRegister={() => setAuthView("register")} />{toaster}</>;
   }
 
   const meta = PAGE_TITLES[activePage] ?? { title: activePage };
@@ -132,20 +151,7 @@ export default function App() {
       <VoucherDetailModal open={viewOpen} onClose={() => { setViewOpen(false); setViewingVoucherId(""); }} voucherId={viewingVoucherId} onEdit={openEdit} />
       <GetVoucherModal open={getOpen} onClose={() => setGetOpen(false)} />
 
-      <Toaster
-        position="bottom-right"
-        toastOptions={{
-          duration: 3000,
-          style: {
-            background: "var(--toast-bg, #fff)",
-            color: "#1A1816",
-            borderRadius: "10px",
-            border: "1px solid #E2DFD8",
-            fontSize: "13px",
-            boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
-          },
-        }}
-      />
+      {toaster}
     </>
   );
 }

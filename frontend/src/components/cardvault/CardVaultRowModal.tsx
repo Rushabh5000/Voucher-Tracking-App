@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import toast from "react-hot-toast";
 import { Modal } from "@/components/ui/Modal";
 import { isSensitiveColumn, type VaultRow } from "@/utils/cardVaultExcel";
 
@@ -16,7 +17,13 @@ interface CardVaultRowModalProps {
 // by the opened Excel file) is exactly what's editable here.
 export function CardVaultRowModal({ open, onClose, onSave, columns, existing }: CardVaultRowModalProps) {
   const [form, setForm]   = useState<Record<string, string>>({});
-  const [error, setError] = useState("");
+  const [error, setErrorState] = useState("");
+  // Every validation error also surfaces as a toast (top-right) — the inline
+  // box alone was easy to miss since it sits at the bottom of the form.
+  function setError(msg: string) {
+    setErrorState(msg);
+    if (msg) toast.error(msg);
+  }
 
   useEffect(() => {
     if (open) {
