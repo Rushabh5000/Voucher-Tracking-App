@@ -8,7 +8,10 @@ import { PERIOD_TYPE_LABEL, periodLabel, comparePeriodKeysDesc } from "@/utils/p
 const TYPE_ORDER = ["QUARTERLY", "HALF_YEARLY", "YEARLY"];
 
 interface CardInfo { key: string; label: string; owner: string }
-interface Cell { has: boolean; redeemed: boolean }
+// Tracks how many vouchers of a brand a card has claimed this period — pure
+// claim count, independent of redemption status (redeeming is a separate
+// concern from whether the periodic benefit was claimed at all).
+interface Cell { count: number }
 
 // A comparison group = same bank + same card type (e.g. "Bank of Baroda · Rupay Platinum").
 // Cards are only ever compared against others in their own group, because different
@@ -91,7 +94,7 @@ export function CardStatsPage() {
 
       const ck = cellKeyOf(id.key, brand);
       const prev = g.cells.get(ck);
-      g.cells.set(ck, { has: true, redeemed: (prev?.redeemed ?? false) || v.status === "REDEEMED" });
+      g.cells.set(ck, { count: (prev?.count ?? 0) + 1 });
     }
 
     const blocks: PeriodBlock[] = [...pMap.values()].map((p) => {
@@ -102,7 +105,7 @@ export function CardStatsPage() {
         for (const [k, val] of g.cells) cells[k] = val;
 
         let pendingCount = 0;
-        for (const c of cards) for (const b of brands) if (!cells[cellKeyOf(c.key, b)]?.has) pendingCount++;
+        for (const c of cards) for (const b of brands) if (!cells[cellKeyOf(c.key, b)]?.count) pendingCount++;
 
         return { groupKey, bank: g.bank, cardType: g.cardType, cards, brands, cells, pendingCount };
       }).sort((a, b) => `${a.bank} ${a.cardType}`.localeCompare(`${b.bank} ${b.cardType}`));
@@ -153,7 +156,8 @@ export function CardStatsPage() {
         <p className="text-xs text-gray-400 dark:text-gray-500 max-w-md">
           Cards are compared only within the same <strong>bank &amp; card type</strong>. A brand is
           “expected” if any card in that group claimed it; cards missing it are marked
-          <span className="text-amber-600 dark:text-amber-400 font-medium"> Pending</span>.
+          <span className="text-amber-600 dark:text-amber-400 font-medium"> Pending</span>. Tracks
+          claims only — redeeming a voucher doesn't change its status here.
         </p>
       </div>
 
@@ -217,7 +221,7 @@ function GroupTable({ group }: { group: Group }) {
           </thead>
           <tbody>
             {cards.map((c) => {
-              const missing = brands.filter((b) => !cells[cellKeyOf(c.key, b)]?.has);
+              const missing = brands.filter((b) => !cells[cellKeyOf(c.key, b)]?.count);
               return (
                 <tr key={c.key} className="border-b border-gray-50 dark:border-gray-800/60 last:border-0">
                   <td className="px-4 py-2.5 sticky left-0 bg-white dark:bg-gray-900 z-10">
@@ -228,12 +232,13 @@ function GroupTable({ group }: { group: Group }) {
                     const cell = cells[cellKeyOf(c.key, b)];
                     return (
                       <td key={b} className="px-3 py-2.5 text-center">
-                        {cell?.has ? (
-                          cell.redeemed ? (
-                            <span title="Claimed & redeemed" className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 text-xs">✓</span>
-                          ) : (
-                            <span title="Claimed (not yet redeemed)" className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 text-xs">✓</span>
-                          )
+                        {cell?.count ? (
+                          <span
+                            title={cell.count > 1 ? `Claimed ${cell.count} times` : "Claimed"}
+                            className="inline-flex items-center justify-center gap-0.5 min-w-6 h-6 px-1.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 text-xs font-medium"
+                          >
+                            ✓{cell.count > 1 && <span className="text-[10px]">×{cell.count}</span>}
+                          </span>
                         ) : (
                           <span title="Pending — not claimed" className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs">✕</span>
                         )}
@@ -262,8 +267,7 @@ function GroupTable({ group }: { group: Group }) {
 
       {/* Legend */}
       <div className="flex flex-wrap gap-4 px-4 py-2 text-xs text-gray-400 dark:text-gray-500 border-t border-gray-100 dark:border-gray-800">
-        <span><span className="inline-block w-2.5 h-2.5 rounded-full bg-sky-400 mr-1 align-middle" />Claimed</span>
-        <span><span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 mr-1 align-middle" />Claimed &amp; redeemed</span>
+        <span><span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 mr-1 align-middle" />Claimed (×N if more than once)</span>
         <span><span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-400 mr-1 align-middle" />Pending</span>
       </div>
     </div>
