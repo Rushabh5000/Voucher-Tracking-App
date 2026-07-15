@@ -37,6 +37,15 @@ export function isSensitiveColumn(column: string): boolean {
   return n === "cvv" || n.includes("card number") || n.includes("cardnumber") || n === "pin" || n.includes("password");
 }
 
+// Descriptive/label columns nobody pastes elsewhere — no copy button for
+// these. Everything else (Email, Number, Card Number, Expiry, CVV, and any
+// column not on this list — including ones you add later) stays copyable.
+const NON_COPY_COLUMNS = new Set(["type", "card type", "acc owner", "account owner", "card name", "bank"]);
+
+export function isCopyableColumn(column: string): boolean {
+  return !NON_COPY_COLUMNS.has(column.trim().toLowerCase());
+}
+
 export function blankRow(columns: string[]): VaultRow {
   return { id: crypto.randomUUID(), values: Object.fromEntries(columns.map((c) => [c, ""])) };
 }

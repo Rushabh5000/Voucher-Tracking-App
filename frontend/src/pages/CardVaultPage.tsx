@@ -5,7 +5,7 @@ import { CardVaultRowModal } from "@/components/cardvault/CardVaultRowModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { copyToClipboard } from "@/utils/formatters";
 import {
-  DEFAULT_COLUMNS, isSensitiveColumn,
+  DEFAULT_COLUMNS, isSensitiveColumn, isCopyableColumn,
   parseWorkbook, downloadWorkbook, supportsFileSystemAccess,
   pickFileToOpen, pickFileToSave, writeToHandle,
   tryLoadDevVaultFile, saveDevVaultFile, openDevVaultFileInDesktopApp,
@@ -426,8 +426,12 @@ export function CardVaultPage() {
                           );
                         }
                         return (
-                          <td key={col} className="px-3 py-2.5">
-                            <CopyCell value={raw} onCopy={() => handleCopy(col, raw)} />
+                          <td key={col} className="px-3 py-2.5 whitespace-nowrap">
+                            {isCopyableColumn(col) ? (
+                              <CopyCell value={raw} onCopy={() => handleCopy(col, raw)} />
+                            ) : (
+                              raw || <span className="text-gray-300 dark:text-gray-600">—</span>
+                            )}
                           </td>
                         );
                       })}
