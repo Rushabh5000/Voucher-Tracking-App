@@ -171,9 +171,9 @@ export function CardVaultPage() {
     if (sort) {
       const { col, dir } = sort;
       list = [...list].sort((a, b) => {
-        const av = (a.row.values[col] ?? "").trim();
-        const bv = (b.row.values[col] ?? "").trim();
-        const cmp = av.localeCompare(bv, undefined, { numeric: true, sensitivity: "base" });
+        const cmp = col === "#"
+          ? a.pos - b.pos
+          : (a.row.values[col] ?? "").trim().localeCompare((b.row.values[col] ?? "").trim(), undefined, { numeric: true, sensitivity: "base" });
         return dir === "asc" ? cmp : -cmp;
       });
     }
@@ -374,7 +374,21 @@ export function CardVaultPage() {
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="text-left text-xs text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-800">
-                  <th className="px-3 py-2 font-medium">#</th>
+                  <th className="px-3 py-2 font-medium">
+                    <button
+                      type="button"
+                      onClick={() => toggleSort("#")}
+                      className={`inline-flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200 ${
+                        sort?.col === "#" ? "text-accent-600 dark:text-accent-400" : ""
+                      }`}
+                      title="Sort by original order"
+                    >
+                      #
+                      <span className="text-[10px] opacity-60">
+                        {sort?.col === "#" ? (sort.dir === "asc" ? "▲" : "▼") : "⇅"}
+                      </span>
+                    </button>
+                  </th>
                   {columns.map((col) => {
                     const active = sort?.col === col;
                     return (
