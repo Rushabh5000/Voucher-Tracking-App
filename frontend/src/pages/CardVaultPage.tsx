@@ -137,7 +137,16 @@ export function CardVaultPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const [sort, setSort] = useState<{ col: string; dir: "asc" | "desc" } | null>(null);
   const hasFilters = Object.values(filters).some((v) => v.trim());
+
+  function toggleSort(col: string) {
+    setSort((s) => {
+      if (!s || s.col !== col) return { col, dir: "asc" };
+      if (s.dir === "asc") return { col, dir: "desc" };
+      return null;
+    });
+  }
 
   // Distinct, non-empty values per non-sensitive column, built purely from
   // rows already in memory — never fetched, never from the backend.
@@ -153,13 +162,23 @@ export function CardVaultPage() {
 
   const filteredRows = useMemo(() => {
     const active = Object.entries(filters).filter(([, v]) => v.trim());
-    if (active.length === 0) return rows.map((r, i) => ({ row: r, pos: i + 1 }));
-    return rows
-      .map((r, i) => ({ row: r, pos: i + 1 }))
-      .filter(({ row }) =>
+    let list = rows.map((r, i) => ({ row: r, pos: i + 1 }));
+    if (active.length > 0) {
+      list = list.filter(({ row }) =>
         active.every(([col, raw]) => (row.values[col] ?? "").toLowerCase().includes(raw.trim().toLowerCase()))
       );
-  }, [rows, filters]);
+    }
+    if (sort) {
+      const { col, dir } = sort;
+      list = [...list].sort((a, b) => {
+        const av = (a.row.values[col] ?? "").trim();
+        const bv = (b.row.values[col] ?? "").trim();
+        const cmp = av.localeCompare(bv, undefined, { numeric: true, sensitivity: "base" });
+        return dir === "asc" ? cmp : -cmp;
+      });
+    }
+    return list;
+  }, [rows, filters, sort]);
 
   function setFilter(col: string, value: string) {
     setFilters((f) => ({ ...f, [col]: value }));
@@ -356,9 +375,26 @@ export function CardVaultPage() {
               <thead>
                 <tr className="text-left text-xs text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-800">
                   <th className="px-3 py-2 font-medium">#</th>
-                  {columns.map((col) => (
-                    <th key={col} className="px-3 py-2 font-medium whitespace-nowrap">{col}</th>
-                  ))}
+                  {columns.map((col) => {
+                    const active = sort?.col === col;
+                    return (
+                      <th key={col} className="px-3 py-2 font-medium whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => toggleSort(col)}
+                          className={`inline-flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200 ${
+                            active ? "text-accent-600 dark:text-accent-400" : ""
+                          }`}
+                          title={`Sort by ${col}`}
+                        >
+                          {col}
+                          <span className="text-[10px] opacity-60">
+                            {active ? (sort!.dir === "asc" ? "▲" : "▼") : "⇅"}
+                          </span>
+                        </button>
+                      </th>
+                    );
+                  })}
                 </tr>
                 <tr className="border-b border-gray-100 dark:border-gray-800">
                   <th className="px-2 py-1.5" />
