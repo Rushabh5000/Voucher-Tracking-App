@@ -230,6 +230,16 @@ async function pruneAuditLogs(): Promise<void> {
 // ─── Job Registration ─────────────────────────────────────────────────────────
 
 export async function startBackupJobs(): Promise<void> {
+  // These backups target the local machine (OneDrive path, host pg_dump /
+  // Docker). On Render there's no Docker, no pg_dump, and the disk is
+  // ephemeral (wiped on every redeploy/restart) — running them there just
+  // burns through failing strategies on every startup and logs noise for a
+  // JSON file nobody will ever read. Real backups happen when running
+  // locally via `npm run dev`/`npm start`, where Render is unset.
+  if (process.env.RENDER) {
+    console.log("[Backup] Running on Render — skipping local-disk backup jobs (source + DB dump)");
+    return;
+  }
 
   // ── 1. Always: DB backup on startup ────────────────────────────────────────
   backupDatabase().catch(err => console.error("[Backup] DB backup error:", err));
