@@ -174,6 +174,7 @@ export function CardModal({ open, onClose, existing }: CardModalProps) {
             placeholder="your@email.com"
             type="email"
             required
+            dropUp
           />
           <SmartInput
             field="mobileNumber"
@@ -183,6 +184,7 @@ export function CardModal({ open, onClose, existing }: CardModalProps) {
             placeholder="9876543210"
             type="tel"
             required
+            dropUp
           />
         </div>
 

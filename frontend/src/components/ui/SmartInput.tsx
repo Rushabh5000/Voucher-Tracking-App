@@ -13,11 +13,12 @@ interface SmartInputProps {
   staticSuggestions?: string[];     // optional fixed suggestions (no API call)
   contextField?: string;            // context field for filtering (e.g. "brand")
   contextValue?: string;            // context value (e.g. "Amazon")
+  dropUp?: boolean;                 // render the suggestion list above the input instead of below
 }
 
 export function SmartInput({
   field, value, onChange, placeholder, label, required,
-  className, type = "text", staticSuggestions, contextField, contextValue,
+  className, type = "text", staticSuggestions, contextField, contextValue, dropUp,
 }: SmartInputProps) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
@@ -103,7 +104,11 @@ export function SmartInput({
         className="input"
       />
       {open && visibleSuggestions.length > 0 && (
-        <ul className="absolute z-50 mt-1 w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-hidden max-h-52 overflow-y-auto">
+        <ul
+          className={`absolute z-50 w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-hidden max-h-52 overflow-y-auto ${
+            dropUp ? "bottom-full mb-1" : "mt-1"
+          }`}
+        >
           {visibleSuggestions.map((s, i) => (
             <li
               key={s}
