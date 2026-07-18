@@ -72,6 +72,19 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
       throw new AppError(400, "Mobile number must be up to 10 digits only");
     }
 
+    // lastFourDigits is encrypted non-deterministically, so duplicates can't be
+    // caught with a DB WHERE clause — decrypt the user's existing cards and
+    // compare the identifying fields (same bank + card type + card name + last
+    // 4 digits means it's the same physical card).
+    const existingCards = await prisma.card.findMany({ where: userWhere(req) });
+    const dupe = existingCards.some((c) =>
+      c.bank.trim().toLowerCase() === bank.trim().toLowerCase() &&
+      c.cardType.trim().toLowerCase() === cardType.trim().toLowerCase() &&
+      c.cardName.trim().toLowerCase() === cardName.trim().toLowerCase() &&
+      decrypt(c.lastFourDigits).trim() === lastFourDigits.trim()
+    );
+    if (dupe) throw new AppError(409, "This card already exists (same bank, card type, card name, and last 4 digits)");
+
     const card = await prisma.card.create({
       data: {
         ...encryptCardFields({
@@ -119,6 +132,19 @@ router.patch("/:id", async (req: Request, res: Response, next: NextFunction) => 
     if (mobileNumber?.trim() && !/^\d{1,10}$/.test(mobileNumber.trim())) {
       throw new AppError(400, "Mobile number must be up to 10 digits only");
     }
+
+    const effBank     = bank?.trim()     || existing.bank;
+    const effCardType = cardType?.trim() || existing.cardType;
+    const effCardName = cardName?.trim() || existing.cardName;
+    const effLast4    = lastFourDigits?.trim() || decrypt(existing.lastFourDigits);
+    const others = await prisma.card.findMany({ where: { ...userWhere(req), id: { not: existing.id } } });
+    const dupe = others.some((c) =>
+      c.bank.trim().toLowerCase() === effBank.toLowerCase() &&
+      c.cardType.trim().toLowerCase() === effCardType.toLowerCase() &&
+      c.cardName.trim().toLowerCase() === effCardName.toLowerCase() &&
+      decrypt(c.lastFourDigits).trim() === effLast4
+    );
+    if (dupe) throw new AppError(409, "This card already exists (same bank, card type, card name, and last 4 digits)");
 
     const encUpdate: any = {};
     if (accountOwner   !== undefined) encUpdate.accountOwner   = accountOwner.trim()   ? encrypt(accountOwner.trim())   : existing.accountOwner;
