@@ -1,0 +1,11 @@
+{
+  "name": "Voucher Tracker",
+  "description": "Track gift cards, vouchers, and promotional balances.",
+  "url": "http://localhost:3001",
+  "ports": [3001, 3002],
+  "primaryPort": 3001,
+  "color": "#10b981",
+  "emoji": "🎟️",
+  "requiresDocker": true,
+  "order": 1
+}
