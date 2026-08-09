@@ -2,14 +2,20 @@ name: Supabase keep-alive
 
 on:
   schedule:
-    # Runs every 3 days at 08:00 UTC — well within Supabase's 7-day pause threshold
-    - cron: "0 8 */3 * *"
+    # Kicks off daily at 08:00 UTC; the actual ping happens at a random
+    # offset after that (see "Random jitter" step below), so it's not the
+    # exact same time every day.
+    - cron: "0 8 * * *"
   workflow_dispatch: # allow manual trigger from GitHub UI
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
+      - name: Random jitter
+        if: github.event_name == 'schedule'
+        run: sleep $((RANDOM % 14400))  # up to 4 hours
+
       - name: Install pg
         run: npm install pg
 
