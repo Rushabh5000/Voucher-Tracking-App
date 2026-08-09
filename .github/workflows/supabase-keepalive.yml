@@ -36,7 +36,10 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          curl -sf "$SUPABASE_URL/rest/v1/" \
+          # The bare /rest/v1/ root (OpenAPI spec) requires a secret key under
+          # Supabase's newer key format; a real table query works fine with the
+          # publishable key, so query one instead.
+          curl -sf "$SUPABASE_URL/rest/v1/Card?select=id&limit=1" \
             -H "apikey: $SUPABASE_ANON_KEY" \
             -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
             -o /dev/null \
