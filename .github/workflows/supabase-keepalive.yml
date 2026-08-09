@@ -25,3 +25,19 @@ jobs:
             .then(() => { console.log('keep-alive ping OK'); return client.end(); })
             .catch(err => { console.error('ping failed:', err.message); process.exit(1); });
           "
+
+      # A raw Postgres connection keeps the database itself warm, but Supabase's
+      # own "project inactive" pause detector watches its monitored API surface
+      # (PostgREST etc.), not direct pg connections — hence pause-warning emails
+      # even though the DB above was pinged on schedule. Also hit the REST API
+      # with the anon key so Supabase counts this as real project activity.
+      - name: Ping Supabase REST API
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          curl -sf "$SUPABASE_URL/rest/v1/" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            -o /dev/null \
+            && echo "REST API ping OK"
