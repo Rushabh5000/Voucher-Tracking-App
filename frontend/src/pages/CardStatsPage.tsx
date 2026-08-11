@@ -97,6 +97,23 @@ export function CardStatsPage() {
       g.cells.set(ck, { count: (prev?.count ?? 0) + 1 });
     }
 
+    // A card with zero claims for a period never appears in the loop above
+    // (it has no voucher to iterate), so it would silently vanish from that
+    // period's table instead of showing up fully pending. Backfill every
+    // card from Cards Summary that matches a group's bank+cardType, even if
+    // it claimed nothing this period.
+    for (const p of pMap.values()) {
+      for (const g of p.groups.values()) {
+        for (const c of cards) {
+          if (c.bank !== g.bank || c.cardType !== g.cardType) continue;
+          const label = `${c.bank} | ${c.lastFourDigits}`;
+          const owner = c.accountOwner || "";
+          const key = `${label}::${owner}`;
+          if (!g.cards.has(key)) g.cards.set(key, { key, label, owner });
+        }
+      }
+    }
+
     const blocks: PeriodBlock[] = [...pMap.values()].map((p) => {
       const groups: Group[] = [...p.groups.entries()].map(([groupKey, g]) => {
         const cards = [...g.cards.values()].sort((a, b) => a.label.localeCompare(b.label));
