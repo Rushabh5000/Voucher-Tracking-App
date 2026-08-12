@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
 import { autocompleteApi } from "@/api/client";
 
 interface SmartInputProps {
@@ -13,8 +14,19 @@ interface SmartInputProps {
   staticSuggestions?: string[];     // optional fixed suggestions (no API call)
   contextField?: string;            // context field for filtering (e.g. "brand")
   contextValue?: string;            // context value (e.g. "Amazon")
-  dropUp?: boolean;                 // render the suggestion list above the input instead of below
+  dropUp?: boolean;                 // force the list above the input; omit to auto-pick based on available space
 }
+
+interface DropdownPos {
+  top: number;
+  left: number;
+  width: number;
+  maxHeight: number;
+  direction: "up" | "down";
+}
+
+const DROPDOWN_GAP = 4;
+const DROPDOWN_MAX = 208; // matches the old max-h-52
 
 export function SmartInput({
   field, value, onChange, placeholder, label, required,
@@ -23,7 +35,9 @@ export function SmartInput({
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
   const [highlighted, setHighlighted] = useState(-1);
+  const [pos, setPos] = useState<DropdownPos | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef      = useRef<HTMLInputElement>(null);
   const debounceRef   = useRef<ReturnType<typeof setTimeout>>();
 
   // Fetch suggestions from API or use static list
@@ -54,12 +68,50 @@ export function SmartInput({
     return () => clearTimeout(debounceRef.current);
   }, [value, open, fetchSuggestions]);
 
-  // Close on outside click
+  // Rendered via a portal to document.body (position: fixed), so it always
+  // escapes any ancestor's overflow/scroll clipping — e.g. a Modal's
+  // scrollable body — regardless of where in the page this input sits.
+  // Recomputed on open and kept anchored on scroll/resize while open.
+  const updatePosition = useCallback(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const goUp = dropUp ?? (spaceBelow < 150 && spaceAbove > spaceBelow);
+    const available = goUp ? spaceAbove : spaceBelow;
+    const maxHeight = Math.max(80, Math.min(DROPDOWN_MAX, available - DROPDOWN_GAP - 8));
+
+    setPos({
+      top:   goUp ? rect.top - DROPDOWN_GAP : rect.bottom + DROPDOWN_GAP,
+      left:  rect.left,
+      width: rect.width,
+      maxHeight,
+      direction: goUp ? "up" : "down",
+    });
+  }, [dropUp]);
+
+  useLayoutEffect(() => {
+    if (!open) { setPos(null); return; }
+    updatePosition();
+    const onScrollOrResize = () => updatePosition();
+    window.addEventListener("scroll", onScrollOrResize, true);
+    window.addEventListener("resize", onScrollOrResize);
+    return () => {
+      window.removeEventListener("scroll", onScrollOrResize, true);
+      window.removeEventListener("resize", onScrollOrResize);
+    };
+  }, [open, updatePosition]);
+
+  // Close on outside click (checks both the input's own container and the
+  // portalled dropdown, since the dropdown no longer lives inside containerRef)
+  const dropdownRef = useRef<HTMLUListElement>(null);
   useEffect(() => {
     function handler(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target as Node;
+      if (containerRef.current?.contains(target)) return;
+      if (dropdownRef.current?.contains(target)) return;
+      setOpen(false);
     }
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -85,6 +137,7 @@ export function SmartInput({
   const visibleSuggestions = suggestions.filter(
     (s) => s.toLowerCase() !== value.toLowerCase()
   );
+  const showDropdown = open && visibleSuggestions.length > 0 && pos;
 
   return (
     <div ref={containerRef} className={`relative ${className || ""}`}>
@@ -94,6 +147,7 @@ export function SmartInput({
         </label>
       )}
       <input
+        ref={inputRef}
         type={type}
         value={value}
         onChange={(e) => { onChange(e.target.value); setOpen(true); setHighlighted(-1); }}
@@ -103,11 +157,18 @@ export function SmartInput({
         autoComplete="off"
         className="input"
       />
-      {open && visibleSuggestions.length > 0 && (
+      {showDropdown && createPortal(
         <ul
-          className={`absolute z-50 w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-hidden max-h-52 overflow-y-auto ${
-            dropUp ? "bottom-full mb-1" : "mt-1"
-          }`}
+          ref={dropdownRef}
+          style={{
+            position: "fixed",
+            top:    pos.direction === "up" ? undefined : pos.top,
+            bottom: pos.direction === "up" ? window.innerHeight - pos.top : undefined,
+            left:   pos.left,
+            width:  pos.width,
+            maxHeight: pos.maxHeight,
+          }}
+          className="fixed z-[100] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-y-auto"
         >
           {visibleSuggestions.map((s, i) => (
             <li
@@ -133,7 +194,8 @@ export function SmartInput({
               <span className="font-medium">"{value.trim()}"</span>
             </li>
           )}
-        </ul>
+        </ul>,
+        document.body
       )}
     </div>
   );
