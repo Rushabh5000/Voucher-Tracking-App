@@ -83,6 +83,7 @@ export function VoucherDetailModal({ open, onClose, voucherId, onEdit }: Voucher
           <Row label="Card owner">{voucher.cardOwner || none}</Row>
           <Row label="Card name">{voucher.cardName || none}</Row>
           <Row label="Email">{voucher.emailId || none}</Row>
+          <Row label="Booking ID">{voucher.bookingId || none}</Row>
           <Row label="Recurring period">
             {voucher.periodType
               ? `${PERIOD_TYPE_LABEL[voucher.periodType] ?? voucher.periodType} · ${periodLabel(voucher.periodType, voucher.periodKey)}`
