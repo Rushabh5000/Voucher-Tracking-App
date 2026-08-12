@@ -65,14 +65,16 @@ export function CvvUsageModal({ open, onClose, cardLabel }: CvvUsageModalProps) 
           label="Brand"
           placeholder="e.g. Amazon"
         />
-        <SmartInput
-          field="bookingId"
-          value={bookingId}
-          onChange={setBookingId}
-          label="Booking ID"
-          placeholder="e.g. order/booking reference"
-          dropUp
-        />
+        <div>
+          <label className="label">Booking ID</label>
+          <input
+            className="input"
+            value={bookingId}
+            onChange={(e) => setBookingId(e.target.value)}
+            placeholder="e.g. order/booking reference"
+            autoComplete="off"
+          />
+        </div>
       </div>
     </Modal>
   );
