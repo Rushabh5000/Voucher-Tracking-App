@@ -107,7 +107,9 @@ export interface CvvUsageLog {
 
 export const cvvUsageApi = {
   create: (data: { cardLabel: string; brand?: string; bookingId?: string }) =>
-    http.post("/cvv-usage", data),
+    http.post<{ data: CvvUsageLog }>("/cvv-usage", data).then(r => r.data.data),
+  update: (id: string, data: { brand?: string; bookingId?: string }) =>
+    http.patch<{ data: CvvUsageLog }>(`/cvv-usage/${id}`, data).then(r => r.data.data),
   lookup: (bookingId: string) =>
     http.get<{ data: CvvUsageLog | null }>("/cvv-usage/lookup", { params: { bookingId } }).then(r => r.data.data),
   list: () =>
