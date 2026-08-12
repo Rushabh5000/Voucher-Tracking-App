@@ -35,6 +35,7 @@ interface FormState {
   hasExpiry: boolean;
   periodType: string;
   periodKey: string;
+  bookingId: string;
   emailId: string;
   cardOwner: string;
   cardName: string;
@@ -57,6 +58,7 @@ function voucherToForm(v: Voucher, cards: Card[]): FormState {
     hasExpiry:          !!v.expiryDate,
     periodType:         v.periodType || "",
     periodKey:          v.periodKey || "",
+    bookingId:          v.bookingId || "",
     emailId:            v.emailId,
     cardOwner:          v.cardOwner,
     cardName:           v.cardName,
@@ -71,7 +73,7 @@ export function EditVoucherModal({ open, onClose, voucherId }: EditVoucherModalP
   const { vouchers, updateVoucher } = useVoucherStore();
   const { cards } = useCardStore();
 
-  const [form, setForm] = useState<FormState>({ voucherCode: "", brand: "", title: "", sourceProgramOrCard: "", sourceCardId: "", description: "", issueDate: "", expiryDate: "", hasExpiry: false, periodType: "", periodKey: "", emailId: "", cardOwner: "", cardName: "" });
+  const [form, setForm] = useState<FormState>({ voucherCode: "", brand: "", title: "", sourceProgramOrCard: "", sourceCardId: "", description: "", issueDate: "", expiryDate: "", hasExpiry: false, periodType: "", periodKey: "", bookingId: "", emailId: "", cardOwner: "", cardName: "" });
   const [saving, setSaving] = useState(false);
   const [error, setErrorState] = useState("");
   // Every validation/API error also surfaces as a toast (top-right) — the
@@ -139,6 +141,7 @@ export function EditVoucherModal({ open, onClose, voucherId }: EditVoucherModalP
         expiryDate:          form.hasExpiry && form.expiryDate ? form.expiryDate : undefined,
         periodType:          form.periodType,
         periodKey:           form.periodKey,
+        bookingId:           form.bookingId.trim(),
         emailId:             form.emailId.trim(),
         cardOwner:           form.cardOwner.trim(),
         cardName:            form.cardName.trim(),
@@ -298,6 +301,15 @@ export function EditVoucherModal({ open, onClose, voucherId }: EditVoucherModalP
           periodType={form.periodType}
           periodKey={form.periodKey}
           onChange={(periodType, periodKey) => setForm((f) => ({ ...f, periodType, periodKey }))}
+        />
+
+        {/* ── Booking ID (optional) ── */}
+        <SmartInput
+          field="bookingId"
+          value={form.bookingId}
+          onChange={upd("bookingId")}
+          label="Booking ID"
+          placeholder="e.g. order/booking reference, if you have one already"
         />
 
         {/* ── Description ── */}
