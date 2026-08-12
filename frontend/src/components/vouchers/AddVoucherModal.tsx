@@ -4,10 +4,11 @@ import { Modal } from "@/components/ui/Modal";
 import { SmartInput } from "@/components/ui/SmartInput";
 import { useVoucherStore } from "@/store/voucherStore";
 import { CardSelectInput } from "./CardSelectInput";
+import { BookingIdSelect } from "./BookingIdSelect";
 import { PeriodSelector } from "./PeriodSelector";
 import { currentPeriodKey } from "@/utils/periods";
 import { useCardStore } from "@/store/cardStore";
-import { cvvUsageApi } from "@/api/client";
+import type { CvvUsageLog } from "@/api/client";
 import type { Card } from "@/types";
 
 // Pulls "bank" and "last 4 digits" back out of a Card Vault row label like
@@ -118,37 +119,30 @@ export function AddVoucherModal({ open, onClose }: AddVoucherModalProps) {
     }));
   }, [cards]);
 
-  // Booking IDs are always unique, so instead of suggesting past ones, look
-  // up whether this one already has a CVV usage log entry (from Card Vault)
-  // and auto-fill brand + source card (which cascades to email/owner/name)
-  // from it — leaving only voucher code, frequency, and issue date to fill by hand.
-  async function handleBookingIdBlur() {
-    const id = form.bookingId.trim();
-    if (!id) return;
-    try {
-      const match = await cvvUsageApi.lookup(id);
-      if (!match) return;
-      const { bank, last4 } = parseCardLabel(match.cardLabel);
-      // Last-4-digits is the reliable identifier here — Card Vault's "Bank"
-      // column and Cards Summary's bank field are independent free-text
-      // entries (e.g. "Punjab National Bank" vs "PNB"), so requiring an
-      // exact bank-name match was silently failing. Lead with last4; only
-      // fall back to a fuzzy bank-name match to disambiguate if more than
-      // one card shares those last 4 digits.
-      const byLast4 = last4 ? cards.filter((c) => c.lastFourDigits === last4) : [];
-      const matchedCard = byLast4.length <= 1
-        ? byLast4[0]
-        : byLast4.find((c) => {
-            const cb = c.bank.trim().toLowerCase();
-            const b  = bank.toLowerCase();
-            return cb === b || cb.includes(b) || b.includes(cb);
-          }) ?? byLast4[0];
-      if (matchedCard) applyCardFields(matchedCard.id);
-      if (match.brand) setForm((f) => ({ ...f, brand: match.brand }));
-      toast.success(matchedCard ? "Auto-filled from CVV log" : "Found the brand, but couldn't match the card — pick it manually");
-    } catch {
-      // Lookup failures shouldn't block manual entry
-    }
+  // Booking IDs are always unique, so BookingIdSelect surfaces your own past
+  // CVV log entries (from Card Vault) as a real picker rather than a
+  // generic type-ahead. Selecting one auto-fills brand + source card
+  // (which cascades to email/owner/name) — leaving only voucher code,
+  // frequency, and issue date to fill by hand.
+  function applyCvvLogMatch(match: CvvUsageLog) {
+    const { bank, last4 } = parseCardLabel(match.cardLabel);
+    // Last-4-digits is the reliable identifier here — Card Vault's "Bank"
+    // column and Cards Summary's bank field are independent free-text
+    // entries (e.g. "Punjab National Bank" vs "PNB"), so requiring an
+    // exact bank-name match was silently failing. Lead with last4; only
+    // fall back to a fuzzy bank-name match to disambiguate if more than
+    // one card shares those last 4 digits.
+    const byLast4 = last4 ? cards.filter((c) => c.lastFourDigits === last4) : [];
+    const matchedCard = byLast4.length <= 1
+      ? byLast4[0]
+      : byLast4.find((c) => {
+          const cb = c.bank.trim().toLowerCase();
+          const b  = bank.toLowerCase();
+          return cb === b || cb.includes(b) || b.includes(cb);
+        }) ?? byLast4[0];
+    if (matchedCard) applyCardFields(matchedCard.id);
+    if (match.brand) setForm((f) => ({ ...f, brand: match.brand }));
+    toast.success(matchedCard ? "Auto-filled from CVV log" : "Found the brand, but couldn't match the card — pick it manually");
   }
 
   function handleIssueDateChange(val: string) {
@@ -237,20 +231,15 @@ export function AddVoucherModal({ open, onClose }: AddVoucherModalProps) {
     >
       <div className="space-y-5">
 
-        {/* ── Booking ID (optional, always unique — no suggestions). If it
-             matches a CVV copy logged from Card Vault, brand + source card
-             (and email/owner/name that cascade from it) auto-fill below. ── */}
-        <div>
-          <label className="label">Booking ID <span className="text-gray-400 text-xs font-normal">(optional — auto-fills the rest if it matches a CVV log entry)</span></label>
-          <input
-            className="input"
-            value={form.bookingId}
-            onChange={(e) => setForm((f) => ({ ...f, bookingId: e.target.value }))}
-            onBlur={handleBookingIdBlur}
-            placeholder="e.g. order/booking reference, if you have one already"
-            autoComplete="off"
-          />
-        </div>
+        {/* ── Booking ID (optional). Pick one from your past CVV log entries
+             (Card Vault), or type/paste one exactly — either way brand +
+             source card (and email/owner/name that cascade from it)
+             auto-fill below. ── */}
+        <BookingIdSelect
+          value={form.bookingId}
+          onChange={(v) => setForm((f) => ({ ...f, bookingId: v }))}
+          onSelectLog={applyCvvLogMatch}
+        />
 
         {/* ── Row 1: Brand (mandatory) + Voucher Code (mandatory) ── */}
         <div className="grid grid-cols-2 gap-4">
