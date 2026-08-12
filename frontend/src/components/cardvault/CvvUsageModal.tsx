@@ -71,6 +71,7 @@ export function CvvUsageModal({ open, onClose, cardLabel }: CvvUsageModalProps) 
           onChange={setBookingId}
           label="Booking ID"
           placeholder="e.g. order/booking reference"
+          dropUp
         />
       </div>
     </Modal>
