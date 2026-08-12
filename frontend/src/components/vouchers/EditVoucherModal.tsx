@@ -303,14 +303,17 @@ export function EditVoucherModal({ open, onClose, voucherId }: EditVoucherModalP
           onChange={(periodType, periodKey) => setForm((f) => ({ ...f, periodType, periodKey }))}
         />
 
-        {/* ── Booking ID (optional) ── */}
-        <SmartInput
-          field="bookingId"
-          value={form.bookingId}
-          onChange={upd("bookingId")}
-          label="Booking ID"
-          placeholder="e.g. order/booking reference, if you have one already"
-        />
+        {/* ── Booking ID (optional, always unique — no suggestions) ── */}
+        <div>
+          <label className="label">Booking ID <span className="text-gray-400 text-xs font-normal">(optional)</span></label>
+          <input
+            className="input"
+            value={form.bookingId}
+            onChange={updE("bookingId")}
+            placeholder="e.g. order/booking reference, if you have one already"
+            autoComplete="off"
+          />
+        </div>
 
         {/* ── Description ── */}
         <div>

@@ -39,14 +39,31 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
       },
     });
 
-    const uid = req.user?.userId ?? null;
-    await Promise.all([
-      brand?.trim()     ? upsertAutocomplete("brand",     brand.trim(),     uid) : Promise.resolve(),
-      bookingId?.trim() ? upsertAutocomplete("bookingId", bookingId.trim(), uid) : Promise.resolve(),
-    ]);
+    // Booking IDs are always unique per transaction, so there's no value in
+    // an autocomplete list for them — only brand gets one.
+    if (brand?.trim()) await upsertAutocomplete("brand", brand.trim(), req.user?.userId ?? null);
 
     auditWriter(req, startAt)("Copied CVV", "CvvUsageLog", log.id, cardLabel.trim(), 201);
     res.status(201).json({ data: formatLog(log) });
+  } catch (e) { next(e); }
+});
+
+// GET /lookup?bookingId=... — find the CVV usage entry for a booking ID, so
+// Add Voucher can auto-fill brand/source card from it. bookingId is
+// encrypted non-deterministically, so this decrypts and compares in app
+// code rather than filtering in the DB query.
+router.get("/lookup", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { bookingId } = req.query as { bookingId?: string };
+    if (!bookingId?.trim()) { res.json({ data: null }); return; }
+
+    const target = bookingId.trim().toLowerCase();
+    const logs = await prisma.cvvUsageLog.findMany({
+      where:   userWhere(req),
+      orderBy: { createdAt: "desc" },
+    });
+    const match = logs.find((l) => l.bookingId && decrypt(l.bookingId).trim().toLowerCase() === target);
+    res.json({ data: match ? formatLog(match) : null });
   } catch (e) { next(e); }
 });
 
