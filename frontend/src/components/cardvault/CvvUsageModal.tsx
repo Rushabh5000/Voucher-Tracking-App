@@ -12,6 +12,7 @@ interface CvvUsageModalProps {
 }
 
 const GAP = 6;
+const EST_HEIGHT = 320; // rough panel height used to decide open-up vs open-down
 
 // Opened the moment a CVV is copied (the copy itself already happened —
 // this never blocks it). Renders as a floating panel anchored just below the
@@ -26,7 +27,7 @@ export function CvvUsageModal({ open, onClose, cardLabel, anchorRect }: CvvUsage
   const [bookingId, setBookingId] = useState("");
   const [error, setError]         = useState("");
   const [saving, setSaving]       = useState(false);
-  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [pos, setPos] = useState<{ top?: number; bottom?: number; left: number; width: number; maxHeight: number } | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -38,7 +39,17 @@ export function CvvUsageModal({ open, onClose, cardLabel, anchorRect }: CvvUsage
     const width = Math.max(320, Math.min(360, window.innerWidth - 24));
     let left = anchorRect.left;
     if (left + width > window.innerWidth - 12) left = Math.max(12, window.innerWidth - width - 12);
-    setPos({ top: anchorRect.bottom + GAP, left, width });
+
+    const spaceBelow = window.innerHeight - anchorRect.bottom - GAP;
+    const spaceAbove = anchorRect.top - GAP;
+    // Open upward if there isn't enough room below for the whole panel but
+    // there's more room above — otherwise stay below and let the panel's
+    // own scroll handle any overflow.
+    if (spaceBelow < EST_HEIGHT && spaceAbove > spaceBelow) {
+      setPos({ bottom: window.innerHeight - anchorRect.top + GAP, left, width, maxHeight: Math.max(160, spaceAbove - 8) });
+    } else {
+      setPos({ top: anchorRect.bottom + GAP, left, width, maxHeight: Math.max(160, spaceBelow - 8) });
+    }
   }, [anchorRect]);
 
   useLayoutEffect(() => {
@@ -90,10 +101,10 @@ export function CvvUsageModal({ open, onClose, cardLabel, anchorRect }: CvvUsage
   return createPortal(
     <div
       ref={panelRef}
-      style={{ position: "fixed", top: pos.top, left: pos.left, width: pos.width }}
-      className="z-[90] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl"
+      style={{ position: "fixed", top: pos.top, bottom: pos.bottom, left: pos.left, width: pos.width, maxHeight: pos.maxHeight }}
+      className="z-[90] flex flex-col bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl"
     >
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-800">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
         <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">CVV copied</span>
         <button
           onClick={onClose}
@@ -103,7 +114,7 @@ export function CvvUsageModal({ open, onClose, cardLabel, anchorRect }: CvvUsage
         </button>
       </div>
 
-      <div className="p-4 space-y-3">
+      <div className="p-4 space-y-3 overflow-y-auto">
         <p className="text-xs text-gray-500 dark:text-gray-400">
           <strong>{cardLabel}</strong> — copied to clipboard. Note what it's for now, or come back
           and fill in the booking ID once it's generated. Both fields are optional.
@@ -132,7 +143,7 @@ export function CvvUsageModal({ open, onClose, cardLabel, anchorRect }: CvvUsage
         )}
       </div>
 
-      <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-gray-100 dark:border-gray-800">
+      <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-gray-100 dark:border-gray-800 flex-shrink-0">
         <button className="btn-secondary" onClick={onClose}>Close</button>
         <button className="btn-primary" onClick={handleSave} disabled={saving}>
           {saving ? "Saving…" : "Save"}
