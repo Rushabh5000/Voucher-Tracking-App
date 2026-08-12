@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import toast from "react-hot-toast";
 import { useCardVaultStore } from "@/store/cardVaultStore";
 import { CardVaultRowModal } from "@/components/cardvault/CardVaultRowModal";
+import { CvvUsageModal } from "@/components/cardvault/CvvUsageModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { copyToClipboard } from "@/utils/formatters";
 import {
@@ -12,15 +13,36 @@ import {
 } from "@/utils/cardVaultExcel";
 
 // Card Vault: a fully local, Excel-backed store for full card details
-// (including card number + CVV). This page must NEVER import api/client.ts,
-// any Zustand store backed by the backend, or otherwise make a network call —
-// see cardVaultExcel.ts and cardVaultStore.ts for the enforced boundary.
+// (including card number + CVV). This page must NEVER import api/client.ts
+// to read or write any actual card field (number, CVV, expiry, etc.), any
+// Zustand store backed by the backend, or otherwise send card data over the
+// network — see cardVaultExcel.ts and cardVaultStore.ts for the enforced
+// boundary. The one deliberate exception is CvvUsageModal: when a CVV is
+// copied it can optionally log a brand/booking ID (never the CVV or card
+// number itself) to the backend, at the user's explicit request.
 //
 // Columns are fully dynamic — driven entirely by the opened file's header
 // row (store.columns). Add/remove a column in Excel and reopen: the table,
 // filters, and Add/Edit form all follow automatically. "sensitive" columns
 // (card number/cvv/pin/password, matched by name) get masking + no
 // autocomplete dropdown; everything else gets a copy button + local dropdown.
+
+// Best-effort identifying label for a vault row (e.g. "Bank Of Baroda | Rushabh •••• 3657"),
+// built from whatever columns exist — used only for the CVV usage log, never
+// sent anywhere containing the actual card number.
+function rowLabel(row: Record<string, string>, columns: string[]): string {
+  const findValue = (pred: (c: string) => boolean) => {
+    const col = columns.find((c) => pred(c.trim().toLowerCase()));
+    return col ? (row[col] ?? "").trim() : "";
+  };
+  const bank = findValue((c) => c === "bank");
+  const name = findValue((c) => c === "card name" || c === "cardname");
+  const cardNumber = findValue((c) => c.includes("card number") || c.includes("cardnumber"));
+  const parts = [bank, name].filter(Boolean);
+  let label = parts.join(" | ") || "Card";
+  if (cardNumber) label += ` •••• ${cardNumber.slice(-4)}`;
+  return label;
+}
 
 const filterInputCls =
   "w-full min-w-[70px] text-xs px-1.5 py-1 rounded border border-gray-200 dark:border-gray-700 " +
@@ -132,6 +154,7 @@ export function CardVaultPage() {
   const [modalOpen, setModalOpen]     = useState(false);
   const [closeConfirm, setCloseConfirm] = useState(false);
   const [revealed, setRevealed]       = useState<Set<string>>(new Set());
+  const [cvvModal, setCvvModal]       = useState<{ open: boolean; cardLabel: string }>({ open: false, cardLabel: "" });
   const [autoLoadChecked, setAutoLoadChecked] = useState(false);
   const autoLoadStarted = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -297,6 +320,15 @@ export function CardVaultPage() {
     toast[ok ? "success" : "error"](ok ? `${label} copied` : "Couldn't copy");
   }
 
+  // CVV gets copied immediately, same as any other field — the usage-log
+  // modal opens at the same time but never blocks or delays the copy.
+  async function handleCvvCopy(value: string, row: Record<string, string>) {
+    if (!value) return;
+    const ok = await copyToClipboard(value);
+    toast[ok ? "success" : "error"](ok ? "CVV copied" : "Couldn't copy");
+    if (ok) setCvvModal({ open: true, cardLabel: rowLabel(row, columns) });
+  }
+
   function toggleReveal(id: string) {
     setRevealed((s) => {
       const next = new Set(s);
@@ -453,6 +485,7 @@ export function CardVaultPage() {
                       {columns.map((col) => {
                         const raw = r.values[col] ?? "";
                         if (isSensitiveColumn(col)) {
+                          const isCvv = col.trim().toLowerCase() === "cvv";
                           const masked = raw
                             ? (isRevealed
                                 ? raw
@@ -461,7 +494,11 @@ export function CardVaultPage() {
                           return (
                             <td key={col} className="px-3 py-2.5">
                               <div className="flex items-center gap-1.5">
-                                <CopyCell value={masked} mono onCopy={() => handleCopy(col, raw)} />
+                                <CopyCell
+                                  value={masked}
+                                  mono
+                                  onCopy={() => isCvv ? handleCvvCopy(raw, r.values) : handleCopy(col, raw)}
+                                />
                                 {raw && (
                                   <button
                                     className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 flex-shrink-0"
@@ -508,6 +545,12 @@ export function CardVaultPage() {
         confirmLabel="Close without saving"
         onConfirm={() => { closeVault(); setCloseConfirm(false); }}
         onCancel={() => setCloseConfirm(false)}
+      />
+
+      <CvvUsageModal
+        open={cvvModal.open}
+        onClose={() => setCvvModal({ open: false, cardLabel: "" })}
+        cardLabel={cvvModal.cardLabel}
       />
     </div>
   );

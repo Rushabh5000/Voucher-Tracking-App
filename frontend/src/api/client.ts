@@ -94,6 +94,14 @@ export const autocompleteApi = {
     http.delete("/autocomplete", { data: { field, value } }),
 };
 
+// ─── CVV usage log (Card Vault) ────────────────────────────────
+// Only ever sends a card label (bank/last4) + optional brand/booking ID —
+// never the CVV or card number itself.
+export const cvvUsageApi = {
+  create: (data: { cardLabel: string; brand?: string; bookingId?: string }) =>
+    http.post("/cvv-usage", data),
+};
+
 // ─── Analytics ────────────────────────────────────────────────
 export const analyticsApi = {
   get: () => http.get<{ data: AnalyticsData }>("/analytics").then(r => r.data.data),

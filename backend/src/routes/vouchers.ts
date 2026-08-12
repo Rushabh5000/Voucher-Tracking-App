@@ -7,7 +7,7 @@ import { prisma } from "../db";
 
 const router = Router();
 
-const ENC_FIELDS = ["voucherCode", "brand", "title", "sourceProgramOrCard", "description", "emailId", "cardOwner", "cardName"] as const;
+const ENC_FIELDS = ["voucherCode", "brand", "title", "sourceProgramOrCard", "description", "emailId", "cardOwner", "cardName", "bookingId"] as const;
 
 function userWhere(req: Request): { userId: string | null } {
   const u = req.user!;
@@ -88,7 +88,7 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     const {
       title, voucherCode, brand, sourceProgramOrCard, description,
       expiryDate, issueDate, emailId, cardOwner, cardName,
-      periodType, periodKey,
+      periodType, periodKey, bookingId,
     } = req.body;
 
     if (!voucherCode?.trim()) throw new AppError(400, "voucherCode is required");
@@ -114,6 +114,7 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
           emailId:             (emailId || "").trim(),
           cardOwner:           (cardOwner || "").trim(),
           cardName:            (cardName || "").trim(),
+          bookingId:           (bookingId || "").trim(),
         }),
         voucherCodeHash: codeHash,
         periodType: (periodType || "").trim(),
@@ -128,6 +129,7 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
       ["brand",               brand.trim()],
       ["title",               (title || "").trim()],
       ["sourceProgramOrCard", (sourceProgramOrCard || "").trim()],
+      ["bookingId",           (bookingId || "").trim()],
     ];
     await Promise.all(
       acFields.filter(([, v]) => v.trim()).map(([field, value]) => upsertAutocomplete(field, value, req.user?.userId ?? null))
@@ -148,7 +150,7 @@ router.patch("/:id", async (req: Request, res: Response, next: NextFunction) => 
     const {
       title, brand, sourceProgramOrCard, description,
       expiryDate, issueDate, emailId, cardOwner, cardName,
-      periodType, periodKey,
+      periodType, periodKey, bookingId,
     } = req.body;
 
     const existing = await prisma.voucher.findFirst({ where: { id: req.params.id, ...userWhere(req) } });
@@ -166,6 +168,7 @@ router.patch("/:id", async (req: Request, res: Response, next: NextFunction) => 
           emailId:             (emailId || "").trim(),
           cardOwner:           (cardOwner || "").trim(),
           cardName:            (cardName || "").trim(),
+          bookingId:           (bookingId || "").trim(),
         }),
         ...(periodType !== undefined ? { periodType: (periodType || "").trim() } : {}),
         ...(periodKey  !== undefined ? { periodKey:  (periodKey  || "").trim() } : {}),
@@ -178,6 +181,7 @@ router.patch("/:id", async (req: Request, res: Response, next: NextFunction) => 
       ["brand",               brand.trim()],
       ["title",               (title || "").trim()],
       ["sourceProgramOrCard", (sourceProgramOrCard || "").trim()],
+      ["bookingId",           (bookingId || "").trim()],
     ];
     await Promise.all(
       acFields.filter(([, v]) => v.trim()).map(([field, value]) => upsertAutocomplete(field, value, req.user?.userId ?? null))
