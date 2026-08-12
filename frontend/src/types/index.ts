@@ -19,6 +19,7 @@ export interface Voucher {
   cardName: string;
   periodType: string;
   periodKey: string;
+  bookingId: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -32,6 +33,7 @@ export interface VoucherFormData {
   expiryDate: string;
   hasExpiry: boolean;
   issueDate: string;
+  bookingId: string;
   // auto-filled from source card (read-only in UI)
   emailId: string;
   cardOwner: string;

@@ -33,6 +33,7 @@ interface FormState {
   // Rupay periodic tracking
   periodType: string;
   periodKey: string;
+  bookingId: string;
   // disabled / auto-filled from card
   emailId: string;
   cardOwner: string;
@@ -52,6 +53,7 @@ function blankForm(defaultBrand = ""): FormState {
     hasExpiry:          false,
     periodType:         "QUARTERLY",
     periodKey:          currentPeriodKey("QUARTERLY"),
+    bookingId:          "",
     emailId:            "",
     cardOwner:          "",
     cardName:           "",
@@ -157,6 +159,7 @@ export function AddVoucherModal({ open, onClose }: AddVoucherModalProps) {
         expiryDate:          form.hasExpiry && form.expiryDate ? form.expiryDate : undefined,
         periodType:          form.periodType,
         periodKey:           form.periodKey,
+        bookingId:           form.bookingId.trim(),
         emailId:             form.emailId.trim(),
         cardOwner:           form.cardOwner.trim(),
         cardName:            form.cardName.trim(),
@@ -319,6 +322,15 @@ export function AddVoucherModal({ open, onClose }: AddVoucherModalProps) {
           periodKey={form.periodKey}
           onChange={(periodType, periodKey) => setForm((f) => ({ ...f, periodType, periodKey }))}
           hideYear
+        />
+
+        {/* ── Booking ID (optional) ── */}
+        <SmartInput
+          field="bookingId"
+          value={form.bookingId}
+          onChange={upd("bookingId")}
+          label="Booking ID"
+          placeholder="e.g. order/booking reference, if you have one already"
         />
 
         {/* ── Description ── */}

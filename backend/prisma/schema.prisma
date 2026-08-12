@@ -27,6 +27,7 @@ model User {
   vouchers             Voucher[]
   cards                Card[]
   autocompleteEntries  AutocompleteEntry[]
+  cvvUsageLogs         CvvUsageLog[]
 
   @@index([role])
   @@index([expiresAt])
@@ -52,6 +53,7 @@ model Voucher {
   cardName            String        @default("")   // encrypted
   periodType          String        @default("")   // "" | "QUARTERLY" | "HALF_YEARLY" | "YEARLY" — for Rupay periodic voucher tracking
   periodKey           String        @default("")   // e.g. "2026-Q1", "2026-H1", "2026"
+  bookingId           String        @default("")   // encrypted — optional order/booking reference
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
   userId              String?
@@ -60,6 +62,23 @@ model Voucher {
   @@index([dateAdded])
   @@index([status])
   @@index([userId])
+}
+
+// A local record of when a Card Vault CVV was copied for a transaction. This
+// intentionally never stores the CVV or card number itself — only enough to
+// know which card and what for, so it doesn't reintroduce the "real card
+// data must never touch the DB" boundary Card Vault otherwise enforces.
+model CvvUsageLog {
+  id        String   @id @default(uuid())
+  cardLabel String                       // encrypted — e.g. "Bank Of Baroda | 3657"
+  brand     String   @default("")        // encrypted
+  bookingId String   @default("")        // encrypted
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
 }
 
 model Card {
