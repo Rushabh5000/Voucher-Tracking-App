@@ -110,6 +110,8 @@ export const cvvUsageApi = {
     http.post("/cvv-usage", data),
   lookup: (bookingId: string) =>
     http.get<{ data: CvvUsageLog | null }>("/cvv-usage/lookup", { params: { bookingId } }).then(r => r.data.data),
+  list: () =>
+    http.get<{ data: CvvUsageLog[] }>("/cvv-usage").then(r => r.data.data),
 };
 
 // ─── Analytics ────────────────────────────────────────────────

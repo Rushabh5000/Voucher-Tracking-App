@@ -48,6 +48,22 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
   } catch (e) { next(e); }
 });
 
+// GET / — list this user's logged entries that have a booking ID, newest
+// first. Powers a picker on Add Voucher so you can select a past booking ID
+// instead of retyping it exactly (booking IDs are always unique, so a
+// generic autocomplete-by-substring list isn't useful — this is a real
+// list of your own past entries instead).
+router.get("/", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const logs = await prisma.cvvUsageLog.findMany({
+      where:   { ...userWhere(req), bookingId: { not: "" } },
+      orderBy: { createdAt: "desc" },
+      take: 200,
+    });
+    res.json({ data: logs.map(formatLog) });
+  } catch (e) { next(e); }
+});
+
 // GET /lookup?bookingId=... — find the CVV usage entry for a booking ID, so
 // Add Voucher can auto-fill brand/source card from it. bookingId is
 // encrypted non-deterministically, so this decrypts and compares in app
