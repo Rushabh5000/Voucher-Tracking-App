@@ -129,9 +129,20 @@ export function AddVoucherModal({ open, onClose }: AddVoucherModalProps) {
       const match = await cvvUsageApi.lookup(id);
       if (!match) return;
       const { bank, last4 } = parseCardLabel(match.cardLabel);
-      const matchedCard = cards.find((c) =>
-        c.bank.trim().toLowerCase() === bank.toLowerCase() && (!last4 || c.lastFourDigits === last4)
-      );
+      // Last-4-digits is the reliable identifier here — Card Vault's "Bank"
+      // column and Cards Summary's bank field are independent free-text
+      // entries (e.g. "Punjab National Bank" vs "PNB"), so requiring an
+      // exact bank-name match was silently failing. Lead with last4; only
+      // fall back to a fuzzy bank-name match to disambiguate if more than
+      // one card shares those last 4 digits.
+      const byLast4 = last4 ? cards.filter((c) => c.lastFourDigits === last4) : [];
+      const matchedCard = byLast4.length <= 1
+        ? byLast4[0]
+        : byLast4.find((c) => {
+            const cb = c.bank.trim().toLowerCase();
+            const b  = bank.toLowerCase();
+            return cb === b || cb.includes(b) || b.includes(cb);
+          }) ?? byLast4[0];
       if (matchedCard) applyCardFields(matchedCard.id);
       if (match.brand) setForm((f) => ({ ...f, brand: match.brand }));
       toast.success(matchedCard ? "Auto-filled from CVV log" : "Found the brand, but couldn't match the card — pick it manually");
