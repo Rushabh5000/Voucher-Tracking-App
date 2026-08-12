@@ -84,9 +84,10 @@ export function BookingIdSelect({ value, onChange, onSelectLog }: BookingIdSelec
     setOpen(false);
   }
 
+  const withBookingId = logs.filter((l) => l.bookingId.trim());
   const filtered = value.trim()
-    ? logs.filter((l) => l.bookingId.toLowerCase().includes(value.trim().toLowerCase()))
-    : logs;
+    ? withBookingId.filter((l) => l.bookingId.toLowerCase().includes(value.trim().toLowerCase()))
+    : withBookingId;
   const showDropdown = open && loaded && filtered.length > 0 && pos;
 
   return (

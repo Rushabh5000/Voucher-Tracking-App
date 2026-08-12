@@ -3,6 +3,7 @@ import toast from "react-hot-toast";
 import { useCardVaultStore } from "@/store/cardVaultStore";
 import { CardVaultRowModal } from "@/components/cardvault/CardVaultRowModal";
 import { CvvUsageModal } from "@/components/cardvault/CvvUsageModal";
+import { CvvUsageLogModal } from "@/components/cardvault/CvvUsageLogModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { copyToClipboard } from "@/utils/formatters";
 import {
@@ -131,7 +132,7 @@ function ColumnFilterInput({
   );
 }
 
-function CopyCell({ value, onCopy, mono }: { value: string; onCopy: () => void; mono?: boolean }) {
+function CopyCell({ value, onCopy, mono }: { value: string; onCopy: (e: React.MouseEvent<HTMLButtonElement>) => void; mono?: boolean }) {
   if (!value) return <span className="text-gray-300 dark:text-gray-600">—</span>;
   return (
     <button
@@ -154,7 +155,8 @@ export function CardVaultPage() {
   const [modalOpen, setModalOpen]     = useState(false);
   const [closeConfirm, setCloseConfirm] = useState(false);
   const [revealed, setRevealed]       = useState<Set<string>>(new Set());
-  const [cvvModal, setCvvModal]       = useState<{ open: boolean; cardLabel: string }>({ open: false, cardLabel: "" });
+  const [cvvModal, setCvvModal]       = useState<{ open: boolean; cardLabel: string; anchorRect: DOMRect | null }>({ open: false, cardLabel: "", anchorRect: null });
+  const [cvvLogOpen, setCvvLogOpen]   = useState(false);
   const [autoLoadChecked, setAutoLoadChecked] = useState(false);
   const autoLoadStarted = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -321,12 +323,15 @@ export function CardVaultPage() {
   }
 
   // CVV gets copied immediately, same as any other field — the usage-log
-  // modal opens at the same time but never blocks or delays the copy.
-  async function handleCvvCopy(value: string, row: Record<string, string>) {
+  // panel opens at the same time but never blocks or delays the copy. It
+  // anchors just below the clicked row (rather than a full-screen modal) so
+  // the rest of the table stays visible behind it.
+  async function handleCvvCopy(value: string, row: Record<string, string>, e: React.MouseEvent<HTMLButtonElement>) {
     if (!value) return;
+    const anchorRect = e.currentTarget.closest("tr")?.getBoundingClientRect() ?? e.currentTarget.getBoundingClientRect();
     const ok = await copyToClipboard(value);
     toast[ok ? "success" : "error"](ok ? "CVV copied" : "Couldn't copy");
-    if (ok) setCvvModal({ open: true, cardLabel: rowLabel(row, columns) });
+    if (ok) setCvvModal({ open: true, cardLabel: rowLabel(row, columns), anchorRect });
   }
 
   function toggleReveal(id: string) {
@@ -373,6 +378,7 @@ export function CardVaultPage() {
         {devFileActive && (
           <button className="btn-secondary text-sm" onClick={handleOpenInExcel}>📊 Open in Excel</button>
         )}
+        <button className="btn-secondary text-sm" onClick={() => setCvvLogOpen(true)}>🧾 CVV usage log</button>
         {(rows.length > 0 || fileName) && (
           <button className="text-xs text-gray-400 hover:text-red-500 ml-auto" onClick={requestClose}>✕ Close vault</button>
         )}
@@ -497,7 +503,7 @@ export function CardVaultPage() {
                                 <CopyCell
                                   value={masked}
                                   mono
-                                  onCopy={() => isCvv ? handleCvvCopy(raw, r.values) : handleCopy(col, raw)}
+                                  onCopy={(e) => isCvv ? handleCvvCopy(raw, r.values, e) : handleCopy(col, raw)}
                                 />
                                 {raw && (
                                   <button
@@ -549,9 +555,12 @@ export function CardVaultPage() {
 
       <CvvUsageModal
         open={cvvModal.open}
-        onClose={() => setCvvModal({ open: false, cardLabel: "" })}
+        onClose={() => setCvvModal({ open: false, cardLabel: "", anchorRect: null })}
         cardLabel={cvvModal.cardLabel}
+        anchorRect={cvvModal.anchorRect}
       />
+
+      <CvvUsageLogModal open={cvvLogOpen} onClose={() => setCvvLogOpen(false)} />
     </div>
   );
 }
