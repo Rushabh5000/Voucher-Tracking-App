@@ -129,7 +129,6 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
       ["brand",               brand.trim()],
       ["title",               (title || "").trim()],
       ["sourceProgramOrCard", (sourceProgramOrCard || "").trim()],
-      ["bookingId",           (bookingId || "").trim()],
     ];
     await Promise.all(
       acFields.filter(([, v]) => v.trim()).map(([field, value]) => upsertAutocomplete(field, value, req.user?.userId ?? null))
@@ -181,7 +180,6 @@ router.patch("/:id", async (req: Request, res: Response, next: NextFunction) => 
       ["brand",               brand.trim()],
       ["title",               (title || "").trim()],
       ["sourceProgramOrCard", (sourceProgramOrCard || "").trim()],
-      ["bookingId",           (bookingId || "").trim()],
     ];
     await Promise.all(
       acFields.filter(([, v]) => v.trim()).map(([field, value]) => upsertAutocomplete(field, value, req.user?.userId ?? null))
