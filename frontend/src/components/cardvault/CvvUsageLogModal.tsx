@@ -64,7 +64,7 @@ export function CvvUsageLogModal({ open, onClose }: CvvUsageLogModalProps) {
       open={open}
       onClose={onClose}
       title="CVV usage log"
-      size="xl"
+      size="2xl"
       footer={<button className="btn-secondary" onClick={onClose}>Close</button>}
     >
       <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
@@ -106,7 +106,7 @@ export function CvvUsageLogModal({ open, onClose }: CvvUsageLogModalProps) {
                         l.brand || <span className="text-gray-300 dark:text-gray-600">—</span>
                       )}
                     </td>
-                    <td className="px-3 py-2.5">
+                    <td className="px-3 py-2.5 whitespace-nowrap">
                       {editing ? (
                         <input
                           className="input py-1 text-sm font-mono"
