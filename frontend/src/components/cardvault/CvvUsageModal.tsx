@@ -67,7 +67,14 @@ export function CvvUsageModal({ open, onClose, cardLabel, anchorRect }: CvvUsage
   useEffect(() => {
     if (!open) return;
     function handleClick(e: MouseEvent) {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) onClose();
+      const target = e.target as HTMLElement;
+      if (panelRef.current?.contains(target)) return;
+      // SmartInput's suggestion dropdown is portaled to document.body too,
+      // so it's a DOM sibling of this panel rather than a descendant —
+      // without this check, clicking a suggestion looked like an outside
+      // click and closed the whole popup before the selection could stick.
+      if (target.closest("[data-portal-dropdown]")) return;
+      onClose();
     }
     function handleKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
