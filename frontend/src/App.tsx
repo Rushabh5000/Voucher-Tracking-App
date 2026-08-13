@@ -1,6 +1,6 @@
 import { useEffect, useState, lazy, Suspense } from "react";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
-import { useUIStore }     from "@/store/uiStore";
 import { useAuthStore }   from "@/store/authStore";
 import { useVoucherStore } from "@/store/voucherStore";
 import { useCardStore }   from "@/store/cardStore";
@@ -14,6 +14,7 @@ import { DashboardPage }  from "@/pages/DashboardPage";
 import { VouchersPage }   from "@/pages/VouchersPage";
 import { CardsPage }      from "@/pages/CardsPage";
 import { CardStatsPage }  from "@/pages/CardStatsPage";
+import { PAGE_PATHS, pageForPath } from "@/utils/routes";
 
 // Lazy-loaded: pulls in the `xlsx` library (~350KB gzipped), so it's kept out
 // of the main bundle and only fetched when the user opens Card Vault.
@@ -43,7 +44,8 @@ const PAGE_TITLES: Record<string, { title: string; subtitle?: string }> = {
 
 export default function App() {
   const { token, role, guestExpiresAt, logout } = useAuthStore();
-  const { activePage } = useUIStore();
+  const { pathname } = useLocation();
+  const activePage = pageForPath(pathname);
   const { load: loadVouchers, loaded, loading, error } = useVoucherStore();
   const { load: loadCards }    = useCardStore();
 
@@ -120,30 +122,35 @@ export default function App() {
       </div>
     ) : activePage === "cards" ? null : null;
 
+  // Every page except Card Vault (which is fully offline and must never
+  // wait on, or be blocked by, backend voucher/card loading) waits behind
+  // the connection gate until the initial data load succeeds.
+  const gated = (el: JSX.Element) =>
+    !loaded ? <ConnectionGate loading={loading} error={error} onRetry={loadVouchers} /> : el;
+
   return (
     <>
       <Layout title={meta.title} subtitle={meta.subtitle} actions={loaded || activePage === "cardvault" ? pageActions : null}>
-        {activePage === "cardvault" ? (
-          // Card Vault is fully offline — it must never wait on (or be blocked by)
-          // backend voucher/card loading.
-          <Suspense fallback={<div className="card p-10 text-center text-sm text-gray-400">Loading Card Vault…</div>}>
-            <CardVaultPage />
-          </Suspense>
-        ) : !loaded ? (
-          <ConnectionGate loading={loading} error={error} onRetry={loadVouchers} />
-        ) : (
-          <>
-        {activePage === "dashboard" && <DashboardPage onAddVoucher={() => setAddOpen(true)} onGetVoucher={() => setGetOpen(true)} onEditVoucher={openEdit} onViewVoucher={openView} />}
-        {activePage === "vouchers"  && <VouchersPage  onAdd={() => setAddOpen(true)} onGetVoucher={() => setGetOpen(true)} onEdit={openEdit} onView={openView} />}
-        {activePage === "wordcloud" && <WordCloudPage onEdit={openEdit} />}
-        {activePage === "cards"     && <CardsPage onEditVoucher={openEdit} />}
-        {activePage === "cardstats" && <CardStatsPage />}
-        {activePage === "analytics" && <AnalyticsPage />}
-        {activePage === "export"    && <ExportPage />}
-        {activePage === "audit"     && <AuditPage />}
-        {activePage === "settings"  && <SettingsPage />}
-          </>
-        )}
+        <Routes>
+          <Route
+            path={PAGE_PATHS.cardvault}
+            element={
+              <Suspense fallback={<div className="card p-10 text-center text-sm text-gray-400">Loading Card Vault…</div>}>
+                <CardVaultPage />
+              </Suspense>
+            }
+          />
+          <Route path={PAGE_PATHS.dashboard} element={gated(<DashboardPage onAddVoucher={() => setAddOpen(true)} onGetVoucher={() => setGetOpen(true)} onEditVoucher={openEdit} onViewVoucher={openView} />)} />
+          <Route path={PAGE_PATHS.vouchers}  element={gated(<VouchersPage  onAdd={() => setAddOpen(true)} onGetVoucher={() => setGetOpen(true)} onEdit={openEdit} onView={openView} />)} />
+          <Route path={PAGE_PATHS.wordcloud} element={gated(<WordCloudPage onEdit={openEdit} />)} />
+          <Route path={PAGE_PATHS.cards}     element={gated(<CardsPage onEditVoucher={openEdit} />)} />
+          <Route path={PAGE_PATHS.cardstats} element={gated(<CardStatsPage />)} />
+          <Route path={PAGE_PATHS.analytics} element={gated(<AnalyticsPage />)} />
+          <Route path={PAGE_PATHS.export}    element={gated(<ExportPage />)} />
+          <Route path={PAGE_PATHS.audit}     element={gated(<AuditPage />)} />
+          <Route path={PAGE_PATHS.settings}  element={gated(<SettingsPage />)} />
+          <Route path="*" element={<Navigate to={PAGE_PATHS.dashboard} replace />} />
+        </Routes>
       </Layout>
 
       <AddVoucherModal open={addOpen} onClose={() => setAddOpen(false)} />
