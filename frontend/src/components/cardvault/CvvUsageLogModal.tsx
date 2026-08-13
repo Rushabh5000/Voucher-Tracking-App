@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { Modal } from "@/components/ui/Modal";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { cvvUsageApi, type CvvUsageLog } from "@/api/client";
 import { fmtDateTime } from "@/utils/formatters";
 
@@ -20,6 +21,8 @@ export function CvvUsageLogModal({ open, onClose }: CvvUsageLogModalProps) {
   const [editBookingId, setEditBookingId] = useState("");
   const [editError, setEditError] = useState("");
   const [saving, setSaving]     = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -40,6 +43,21 @@ export function CvvUsageLogModal({ open, onClose }: CvvUsageLogModalProps) {
   function cancelEdit() {
     setEditingId(null);
     setEditError("");
+  }
+
+  async function confirmDelete() {
+    if (!deleteId) return;
+    setDeleting(true);
+    try {
+      await cvvUsageApi.remove(deleteId);
+      setLogs((ls) => ls.filter((l) => l.id !== deleteId));
+      toast.success("Deleted");
+      setDeleteId(null);
+    } catch {
+      toast.error("Couldn't delete the entry");
+    } finally {
+      setDeleting(false);
+    }
   }
 
   async function saveEdit(id: string) {
@@ -133,9 +151,14 @@ export function CvvUsageLogModal({ open, onClose }: CvvUsageLogModalProps) {
                           </button>
                         </div>
                       ) : (
-                        <button className="text-xs text-accent-600 dark:text-accent-400 hover:underline" onClick={() => startEdit(l)}>
-                          Edit
-                        </button>
+                        <div className="flex items-center justify-end gap-3">
+                          <button className="text-xs text-accent-600 dark:text-accent-400 hover:underline" onClick={() => startEdit(l)}>
+                            Edit
+                          </button>
+                          <button className="text-xs text-gray-400 hover:text-red-500" onClick={() => setDeleteId(l.id)}>
+                            Delete
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -145,6 +168,15 @@ export function CvvUsageLogModal({ open, onClose }: CvvUsageLogModalProps) {
           </table>
         </div>
       )}
+
+      <ConfirmDialog
+        open={deleteId !== null}
+        title="Delete this log entry?"
+        message="This removes the brand/booking ID record for this CVV copy. It doesn't affect the card itself or anything in Card Vault."
+        confirmLabel={deleting ? "Deleting…" : "Delete"}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteId(null)}
+      />
     </Modal>
   );
 }

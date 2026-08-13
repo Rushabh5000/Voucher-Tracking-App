@@ -27,6 +27,7 @@ export function BookingIdSelect({ value, onChange, onSelectLog }: BookingIdSelec
   const [logs, setLogs] = useState<CvvUsageLog[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [open, setOpen] = useState(false);
+  const [highlighted, setHighlighted] = useState(-1);
   const [pos, setPos] = useState<DropdownPos | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -82,6 +83,7 @@ export function BookingIdSelect({ value, onChange, onSelectLog }: BookingIdSelec
     onChange(log.bookingId);
     onSelectLog(log);
     setOpen(false);
+    setHighlighted(-1);
   }
 
   const withBookingId = logs.filter((l) => l.bookingId.trim());
@@ -90,6 +92,23 @@ export function BookingIdSelect({ value, onChange, onSelectLog }: BookingIdSelec
     : withBookingId;
   const showDropdown = open && loaded && filtered.length > 0 && pos;
 
+  // Tab (or Enter) picks the highlighted suggestion — defaulting to the
+  // first match — same as a real autocomplete, instead of just tabbing past
+  // the field with nothing selected.
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!showDropdown) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); setHighlighted((h) => Math.min(h + 1, filtered.length - 1)); return; }
+    if (e.key === "ArrowUp")   { e.preventDefault(); setHighlighted((h) => Math.max(h - 1, 0)); return; }
+    if (e.key === "Escape")    { setOpen(false); setHighlighted(-1); return; }
+    if (e.key === "Enter" || e.key === "Tab") {
+      const pick = filtered[highlighted] ?? filtered[0];
+      if (pick) {
+        if (e.key === "Enter") e.preventDefault();
+        select(pick);
+      }
+    }
+  }
+
   return (
     <div ref={containerRef} className="relative">
       <label className="label">Booking ID <span className="text-gray-400 text-xs font-normal">(optional — pick a past one to auto-fill the rest)</span></label>
@@ -97,8 +116,9 @@ export function BookingIdSelect({ value, onChange, onSelectLog }: BookingIdSelec
         ref={inputRef}
         className="input"
         value={value}
-        onChange={(e) => { onChange(e.target.value); setOpen(true); }}
+        onChange={(e) => { onChange(e.target.value); setOpen(true); setHighlighted(-1); }}
         onFocus={() => setOpen(true)}
+        onKeyDown={handleKeyDown}
         placeholder="e.g. order/booking reference, if you have one already"
         autoComplete="off"
       />
@@ -115,11 +135,16 @@ export function BookingIdSelect({ value, onChange, onSelectLog }: BookingIdSelec
           }}
           className="fixed z-[100] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-y-auto"
         >
-          {filtered.map((l) => (
+          {filtered.map((l, i) => (
             <li
               key={l.id}
               onMouseDown={(e) => { e.preventDefault(); select(l); }}
-              className="px-3 py-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 border-b border-gray-50 dark:border-gray-800/60 last:border-0"
+              onMouseEnter={() => setHighlighted(i)}
+              className={`px-3 py-2 text-sm cursor-pointer border-b border-gray-50 dark:border-gray-800/60 last:border-0 ${
+                i === highlighted
+                  ? "bg-accent-50 dark:bg-accent-900/30"
+                  : "hover:bg-gray-50 dark:hover:bg-gray-800"
+              }`}
             >
               <div className="font-medium text-gray-800 dark:text-gray-200 font-mono">{l.bookingId}</div>
               <div className="text-xs text-gray-400 truncate">
