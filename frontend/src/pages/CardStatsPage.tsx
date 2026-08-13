@@ -1,8 +1,8 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useVoucherStore } from "@/store/voucherStore";
 import { useCardStore } from "@/store/cardStore";
 import type { Voucher } from "@/types";
-import { PERIOD_TYPE_LABEL, periodLabel, comparePeriodKeysDesc } from "@/utils/periods";
+import { PERIOD_TYPE_LABEL, periodLabel, comparePeriodKeysDesc, parsePeriodKey, type PeriodType } from "@/utils/periods";
 
 // Order in which period frequencies are displayed
 const TYPE_ORDER = ["QUARTERLY", "HALF_YEARLY", "YEARLY"];
@@ -45,6 +45,7 @@ function cardIdentity(v: Voucher): CardInfo {
 export function CardStatsPage() {
   const { vouchers } = useVoucherStore();
   const { cards } = useCardStore();
+  const [year, setYear] = useState(() => new Date().getFullYear());
 
   // Map "Bank | last4" → { bank, cardType } so each voucher can find its card program
   const cardMeta = useMemo(() => {
@@ -140,7 +141,33 @@ export function CardStatsPage() {
     return blocks;
   }, [vouchers, cardMeta]);
 
-  const totalPending = periods.reduce((s, p) => s + p.pendingCount, 0);
+  // Years with at least one tracked period, plus the current year even if
+  // it has none yet, so the dropdown always has somewhere sensible to land.
+  const years = useMemo(() => {
+    const set = new Set<number>([new Date().getFullYear()]);
+    for (const p of periods) set.add(parsePeriodKey(p.periodType as PeriodType, p.periodKey).year);
+    return [...set].sort((a, b) => b - a);
+  }, [periods]);
+
+  const yearPeriods = useMemo(
+    () => periods.filter((p) => parsePeriodKey(p.periodType as PeriodType, p.periodKey).year === year),
+    [periods, year]
+  );
+
+  const totalPending = yearPeriods.reduce((s, p) => s + p.pendingCount, 0);
+
+  const yearSelector = (
+    <label className="flex items-center gap-2 text-sm">
+      <span className="text-gray-500 dark:text-gray-400">Year</span>
+      <select
+        className="input py-1.5 w-auto"
+        value={year}
+        onChange={(e) => setYear(Number(e.target.value))}
+      >
+        {years.map((y) => <option key={y} value={y}>{y}</option>)}
+      </select>
+    </label>
+  );
 
   if (periods.length === 0) {
     return (
@@ -161,7 +188,7 @@ export function CardStatsPage() {
       {/* Summary banner */}
       <div className="card p-4 flex flex-wrap items-center gap-x-8 gap-y-2">
         <div>
-          <div className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{periods.length}</div>
+          <div className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{yearPeriods.length}</div>
           <div className="text-xs text-gray-500 dark:text-gray-400">Tracked periods</div>
         </div>
         <div>
@@ -170,15 +197,24 @@ export function CardStatsPage() {
           </div>
           <div className="text-xs text-gray-500 dark:text-gray-400">Pending across all cards</div>
         </div>
-        <p className="text-xs text-gray-400 dark:text-gray-500 max-w-md">
+        <p className="text-xs text-gray-400 dark:text-gray-500 max-w-md flex-1">
           Cards are compared only within the same <strong>bank &amp; card type</strong>. A brand is
           “expected” if any card in that group claimed it; cards missing it are marked
           <span className="text-amber-600 dark:text-amber-400 font-medium"> Pending</span>. Tracks
           claims only — redeeming a voucher doesn't change its status here.
         </p>
+        {yearSelector}
       </div>
 
-      {periods.map((p) => (
+      {yearPeriods.length === 0 && (
+        <div className="card p-8 text-center max-w-xl mx-auto">
+          <div className="text-4xl mb-3">📅</div>
+          <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">No periods tracked for {year}</h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Try a different year from the dropdown above.</p>
+        </div>
+      )}
+
+      {yearPeriods.map((p) => (
         <div key={`${p.periodType}###${p.periodKey}`} className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
