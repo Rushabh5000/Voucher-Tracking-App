@@ -1,16 +1,13 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { Page } from "@/types";
 
 interface UIState {
   theme: "light" | "dark";
   sidebarOpen: boolean;
-  activePage: Page;
   toggleTheme: () => void;
   setTheme: (t: "light" | "dark") => void;
   toggleSidebar: () => void;
   setSidebarOpen: (open: boolean) => void;
-  setActivePage: (page: Page) => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -18,7 +15,6 @@ export const useUIStore = create<UIState>()(
     (set, get) => ({
       theme: "light",
       sidebarOpen: typeof window !== "undefined" ? window.innerWidth >= 1024 : true,
-      activePage: "dashboard",
 
       toggleTheme: () => {
         const next = get().theme === "light" ? "dark" : "light";
@@ -31,7 +27,6 @@ export const useUIStore = create<UIState>()(
       },
       toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
       setSidebarOpen: (open) => set({ sidebarOpen: open }),
-      setActivePage:  (page) => set({ activePage: page }),
     }),
     {
       name: "vt-ui",

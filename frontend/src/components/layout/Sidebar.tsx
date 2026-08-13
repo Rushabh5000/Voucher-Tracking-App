@@ -1,5 +1,7 @@
+import { NavLink } from "react-router-dom";
 import { useUIStore }   from "@/store/uiStore";
 import { useAuthStore }  from "@/store/authStore";
+import { PAGE_PATHS } from "@/utils/routes";
 import type { Page }     from "@/types";
 
 interface NavItem { id: Page; label: string; icon: string; }
@@ -18,7 +20,7 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 export function Sidebar() {
-  const { activePage, setActivePage, sidebarOpen, toggleSidebar, theme, toggleTheme } = useUIStore();
+  const { sidebarOpen, toggleSidebar, theme, toggleTheme } = useUIStore();
   const { logout, username, role } = useAuthStore();
 
   return (
@@ -56,15 +58,17 @@ export function Sidebar() {
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto p-2 space-y-0.5">
           {NAV_ITEMS.map((item) => (
-            <button
+            <NavLink
               key={item.id}
-              onClick={() => { setActivePage(item.id); if (window.innerWidth < 1024) toggleSidebar(); }}
-              className={`sidebar-link w-full ${activePage === item.id ? "active" : ""} ${!sidebarOpen ? "justify-center px-2" : ""}`}
+              to={PAGE_PATHS[item.id]}
+              end={item.id === "dashboard"}
+              onClick={() => { if (window.innerWidth < 1024) toggleSidebar(); }}
+              className={({ isActive }) => `sidebar-link w-full ${isActive ? "active" : ""} ${!sidebarOpen ? "justify-center px-2" : ""}`}
               title={!sidebarOpen ? item.label : undefined}
             >
               <span className="text-base w-5 text-center flex-shrink-0">{item.icon}</span>
               {sidebarOpen && <span className="truncate">{item.label}</span>}
-            </button>
+            </NavLink>
           ))}
         </nav>
 
