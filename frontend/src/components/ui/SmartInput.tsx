@@ -160,6 +160,7 @@ export function SmartInput({
       {showDropdown && createPortal(
         <ul
           ref={dropdownRef}
+          data-portal-dropdown
           style={{
             position: "fixed",
             top:    pos.direction === "up" ? undefined : pos.top,
