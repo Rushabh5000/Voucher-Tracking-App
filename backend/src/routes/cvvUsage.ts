@@ -91,6 +91,18 @@ router.patch("/:id", async (req: Request, res: Response, next: NextFunction) => 
   } catch (e) { next(e); }
 });
 
+// DELETE /:id — remove a logged entry.
+router.delete("/:id", async (req: Request, res: Response, next: NextFunction) => {
+  const startAt = Date.now();
+  try {
+    const existing = await prisma.cvvUsageLog.findFirst({ where: { id: req.params.id, ...userWhere(req) } });
+    if (!existing) throw new AppError(404, "Log entry not found");
+    await prisma.cvvUsageLog.delete({ where: { id: req.params.id } });
+    auditWriter(req, startAt)("Deleted CVV usage log", "CvvUsageLog", existing.id, decrypt(existing.cardLabel));
+    res.json({ success: true });
+  } catch (e) { next(e); }
+});
+
 // GET / — list this user's logged entries, newest first. Powers both the
 // Booking ID picker on Add Voucher (which filters to entries that have a
 // booking ID) and the CVV log view/edit screen (which shows everything,
