@@ -238,6 +238,12 @@ export function CardStatsPage() {
 function GroupTable({ group }: { group: Group }) {
   const { bank, cardType, cards, brands, cells, pendingCount } = group;
 
+  // A brand where every card in the group has claimed it adds nothing but
+  // clutter as more brands pile up — pull those columns out of the matrix
+  // and summarize them in one line instead.
+  const clearedBrands = brands.filter((b) => cards.every((c) => cells[cellKeyOf(c.key, b)]?.count));
+  const visibleBrands = brands.filter((b) => !clearedBrands.includes(b));
+
   return (
     <div className="card overflow-hidden">
       {/* Group header: bank + card type */}
@@ -260,13 +266,19 @@ function GroupTable({ group }: { group: Group }) {
         )}
       </div>
 
+      {clearedBrands.length > 0 && (
+        <div className="px-4 py-2 text-xs text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-900/15 border-b border-gray-100 dark:border-gray-800">
+          <span className="font-medium">✓ All cards clear:</span> {clearedBrands.join(", ")}
+        </div>
+      )}
+
       {/* Matrix */}
       <div className="overflow-x-auto">
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr className="text-left text-xs text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-800">
               <th className="px-4 py-2 font-medium sticky left-0 bg-white dark:bg-gray-900 z-10">Card</th>
-              {brands.map((b) => (
+              {visibleBrands.map((b) => (
                 <th key={b} className="px-3 py-2 font-medium text-center whitespace-nowrap">{b}</th>
               ))}
               <th className="px-4 py-2 font-medium">Pending for this card</th>
@@ -281,7 +293,7 @@ function GroupTable({ group }: { group: Group }) {
                     <div className="font-medium text-gray-800 dark:text-gray-200 whitespace-nowrap">{c.label}</div>
                     {c.owner && <div className="text-xs text-gray-400">{c.owner}</div>}
                   </td>
-                  {brands.map((b) => {
+                  {visibleBrands.map((b) => {
                     const cell = cells[cellKeyOf(c.key, b)];
                     return (
                       <td key={b} className="px-3 py-2.5 text-center">
