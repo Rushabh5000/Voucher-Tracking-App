@@ -238,6 +238,11 @@ export function CardStatsPage() {
 function GroupTable({ group }: { group: Group }) {
   const { bank, cardType, cards, brands, cells, pendingCount } = group;
 
+  // A fully-claimed group has nothing left to act on, so collapse it by
+  // default once there's more than one group to scroll past — still one
+  // click away to double-check.
+  const [collapsed, setCollapsed] = useState(pendingCount === 0);
+
   // A brand where every card in the group has claimed it adds nothing but
   // clutter as more brands pile up — pull those columns out of the matrix
   // and summarize them in one line instead.
@@ -246,9 +251,14 @@ function GroupTable({ group }: { group: Group }) {
 
   return (
     <div className="card overflow-hidden">
-      {/* Group header: bank + card type */}
-      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+      {/* Group header: bank + card type — click to expand/collapse */}
+      <button
+        type="button"
+        onClick={() => setCollapsed((c) => !c)}
+        className="w-full flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-gray-100 dark:border-gray-800 text-left hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors"
+      >
         <div className="flex items-center gap-2">
+          <span className={`text-xs text-gray-400 transition-transform ${collapsed ? "-rotate-90" : ""}`}>▾</span>
           <span className="text-base">💳</span>
           <span className="font-semibold text-gray-900 dark:text-gray-100">{bank}</span>
           <span className="text-xs px-2 py-0.5 rounded-full bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300">
@@ -264,8 +274,10 @@ function GroupTable({ group }: { group: Group }) {
             All claimed ✓
           </span>
         )}
-      </div>
+      </button>
 
+      {collapsed ? null : (
+        <>
       {clearedBrands.length > 0 && (
         <div className="px-4 py-2 text-xs text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-900/15 border-b border-gray-100 dark:border-gray-800">
           <span className="font-medium">✓ All cards clear:</span> {clearedBrands.join(", ")}
@@ -335,6 +347,8 @@ function GroupTable({ group }: { group: Group }) {
         <span><span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 mr-1 align-middle" />Claimed (×N if more than once)</span>
         <span><span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-400 mr-1 align-middle" />Pending</span>
       </div>
+        </>
+      )}
     </div>
   );
 }
