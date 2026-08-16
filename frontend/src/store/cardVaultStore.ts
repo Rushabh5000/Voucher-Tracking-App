@@ -1,5 +1,13 @@
 import { create } from "zustand";
-import type { VaultRow } from "@/utils/cardVaultExcel";
+import { DONE_COLUMN, type VaultRow } from "@/utils/cardVaultExcel";
+
+// Every vault gets a "Done" column, whether or not it was in the opened
+// file's header row — it's the mark-as-done-for-this-quarter checkbox
+// (CardVaultPage), persisted into the file itself like any other column so
+// it survives refreshes and server restarts without touching a DB.
+function withDoneColumn(columns: string[]): string[] {
+  return columns.includes(DONE_COLUMN) ? columns : [...columns, DONE_COLUMN];
+}
 
 // Deliberately NOT using zustand's `persist` middleware — this store must never
 // touch localStorage, sessionStorage, or the backend. Data lives only in memory
@@ -33,9 +41,9 @@ export const useCardVaultStore = create<CardVaultState>()((set) => ({
   dirty: false,
 
   loadRows: (columns, rows, fileName, handle, devFileActive = false) =>
-    set({ columns, rows, fileName, fileHandle: handle, devFileActive, dirty: false }),
+    set({ columns: withDoneColumn(columns), rows, fileName, fileHandle: handle, devFileActive, dirty: false }),
 
-  ensureColumns: (columns) => set((s) => (s.columns.length === 0 ? { columns } : {})),
+  ensureColumns: (columns) => set((s) => (s.columns.length === 0 ? { columns: withDoneColumn(columns) } : {})),
 
   addRow: (row) => set((s) => ({ rows: [...s.rows, row], dirty: true })),
 
