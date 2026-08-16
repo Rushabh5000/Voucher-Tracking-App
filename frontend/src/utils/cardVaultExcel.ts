@@ -29,6 +29,12 @@ export const DEFAULT_COLUMNS = [
   "Email", "Number", "Card Number", "Expiry", "CVV",
 ];
 
+// The "mark as done for this quarter" checkbox column — see cardVaultStore.ts.
+// Stores the quarter key it was checked in (e.g. "2026-Q3") rather than a
+// plain boolean, so the checkbox naturally reads as unchecked again once the
+// quarter rolls over, without needing any separate reset step.
+export const DONE_COLUMN = "Done";
+
 // Column-name heuristic for sensitive fields (masked in the table by default,
 // no autocomplete dropdown offered). Matched case-insensitively so it still
 // works if the user renames/reorders columns in Excel.
