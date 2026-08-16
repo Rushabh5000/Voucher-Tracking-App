@@ -2,38 +2,45 @@ import { useMemo, useState } from "react";
 import { useVoucherStore } from "@/store/voucherStore";
 import { useCardStore } from "@/store/cardStore";
 import type { Voucher } from "@/types";
-import { PERIOD_TYPE_LABEL, periodLabel, comparePeriodKeysDesc, parsePeriodKey, type PeriodType } from "@/utils/periods";
+import { comparePeriodKeysDesc, parsePeriodKey, type PeriodType } from "@/utils/periods";
 
-// Order in which period frequencies are displayed
+// Order in which period frequencies are displayed within a column set
 const TYPE_ORDER = ["QUARTERLY", "HALF_YEARLY", "YEARLY"];
 
+// Compact tag for a column header, e.g. "Q1", "H2", "Yearly"
+function shortPeriodTag(periodType: string, periodKey: string): string {
+  if (periodType === "YEARLY") return "Yearly";
+  const { sub } = parsePeriodKey(periodType as PeriodType, periodKey);
+  return periodType === "QUARTERLY" ? `Q${sub}` : `H${sub}`;
+}
+
 interface CardInfo { key: string; label: string; owner: string }
-// Tracks how many vouchers of a brand a card has claimed this period — pure
+// Tracks how many vouchers of a brand+period a card has claimed — pure
 // claim count, independent of redemption status (redeeming is a separate
 // concern from whether the periodic benefit was claimed at all).
 interface Cell { count: number }
 
+// One column = a specific brand within a specific period (e.g. "Amazon · Q1"
+// and "Amazon · Q2" are different columns) — quarterly, half-yearly, and
+// yearly benefits are all independent, so claiming one never counts toward
+// another even though they now share a table.
+interface Column { key: string; brand: string; periodType: string; periodKey: string; tag: string }
+
 // A comparison group = same bank + same card type (e.g. "Bank of Baroda · Rupay Platinum").
 // Cards are only ever compared against others in their own group, because different
-// card programs offer different voucher catalogues.
+// card programs offer different voucher catalogues. One table per group covers the
+// whole selected year, with a column per brand+period combo that occurred in it.
 interface Group {
   groupKey: string;
   bank: string;
   cardType: string;
   cards: CardInfo[];
-  brands: string[];
+  columns: Column[];
   cells: Record<string, Cell>;
   pendingCount: number;
 }
 
-interface PeriodBlock {
-  periodType: string;
-  periodKey: string;
-  groups: Group[];
-  pendingCount: number;
-}
-
-const cellKeyOf = (cardKey: string, brand: string) => `${cardKey}|||${brand}`;
+const cellKeyOf = (cardKey: string, colKey: string) => `${cardKey}|||${colKey}`;
 
 // The specific card a voucher belongs to (identity within a group)
 function cardIdentity(v: Voucher): CardInfo {
@@ -54,28 +61,35 @@ export function CardStatsPage() {
     return m;
   }, [cards]);
 
-  const periods = useMemo<PeriodBlock[]>(() => {
-    // Only vouchers tagged with a recurring period participate. Older vouchers have
-    // an empty periodType and are naturally excluded.
-    const periodic = vouchers.filter((v) => v.periodType);
+  // All years with at least one tracked period, plus the current year even if
+  // it has none yet, so the dropdown always has somewhere sensible to land.
+  const years = useMemo(() => {
+    const set = new Set<number>([new Date().getFullYear()]);
+    for (const v of vouchers) {
+      if (!v.periodType) continue;
+      set.add(parsePeriodKey(v.periodType as PeriodType, v.periodKey).year);
+    }
+    return [...set].sort((a, b) => b - a);
+  }, [vouchers]);
 
-    const pMap = new Map<string, {
-      periodType: string;
-      periodKey: string;
-      groups: Map<string, {
-        bank: string;
-        cardType: string;
-        cards: Map<string, CardInfo>;
-        brands: Set<string>;
-        cells: Map<string, Cell>;
-      }>;
+  const hasAnyPeriodic = useMemo(() => vouchers.some((v) => v.periodType), [vouchers]);
+
+  const groups = useMemo<Group[]>(() => {
+    // Only vouchers tagged with a recurring period, within the selected year, participate.
+    const periodic = vouchers.filter((v) => {
+      if (!v.periodType) return false;
+      return parsePeriodKey(v.periodType as PeriodType, v.periodKey).year === year;
+    });
+
+    const gMap = new Map<string, {
+      bank: string;
+      cardType: string;
+      cards: Map<string, CardInfo>;
+      columns: Map<string, Column>;
+      cells: Map<string, Cell>;
     }>();
 
     for (const v of periodic) {
-      const pk = `${v.periodType}###${v.periodKey}`;
-      let p = pMap.get(pk);
-      if (!p) { p = { periodType: v.periodType, periodKey: v.periodKey, groups: new Map() }; pMap.set(pk, p); }
-
       // Resolve the card program (bank + type). Fall back to the label prefix if the
       // source card no longer exists in the user's card list.
       const meta = cardMeta.get(v.sourceProgramOrCard);
@@ -84,77 +98,59 @@ export function CardStatsPage() {
       const cardType = meta?.cardType ?? "Unknown type";
       const gk = `${bank}:::${cardType}`;
 
-      let g = p.groups.get(gk);
-      if (!g) { g = { bank, cardType, cards: new Map(), brands: new Set(), cells: new Map() }; p.groups.set(gk, g); }
+      let g = gMap.get(gk);
+      if (!g) { g = { bank, cardType, cards: new Map(), columns: new Map(), cells: new Map() }; gMap.set(gk, g); }
 
       const id = cardIdentity(v);
       if (!g.cards.has(id.key)) g.cards.set(id.key, id);
 
       const brand = v.brand || "Uncategorized";
-      g.brands.add(brand);
+      const colKey = `${v.periodType}###${v.periodKey}###${brand}`;
+      if (!g.columns.has(colKey)) {
+        g.columns.set(colKey, { key: colKey, brand, periodType: v.periodType, periodKey: v.periodKey, tag: shortPeriodTag(v.periodType, v.periodKey) });
+      }
 
-      const ck = cellKeyOf(id.key, brand);
+      const ck = cellKeyOf(id.key, colKey);
       const prev = g.cells.get(ck);
       g.cells.set(ck, { count: (prev?.count ?? 0) + 1 });
     }
 
-    // A card with zero claims for a period never appears in the loop above
-    // (it has no voucher to iterate), so it would silently vanish from that
-    // period's table instead of showing up fully pending. Backfill every
-    // card from Cards Summary that matches a group's bank+cardType, even if
-    // it claimed nothing this period.
-    for (const p of pMap.values()) {
-      for (const g of p.groups.values()) {
-        for (const c of cards) {
-          if (c.bank !== g.bank || c.cardType !== g.cardType) continue;
-          const label = `${c.bank} | ${c.lastFourDigits}`;
-          const owner = c.accountOwner || "";
-          const key = `${label}::${owner}`;
-          if (!g.cards.has(key)) g.cards.set(key, { key, label, owner });
-        }
+    // A card with zero claims all year never appears in the loop above (it has
+    // no voucher to iterate), so it would silently vanish instead of showing
+    // up fully pending. Backfill every card from Cards Summary that matches a
+    // group's bank+cardType, even if it claimed nothing this year.
+    for (const g of gMap.values()) {
+      for (const c of cards) {
+        if (c.bank !== g.bank || c.cardType !== g.cardType) continue;
+        const label = `${c.bank} | ${c.lastFourDigits}`;
+        const owner = c.accountOwner || "";
+        const key = `${label}::${owner}`;
+        if (!g.cards.has(key)) g.cards.set(key, { key, label, owner });
       }
     }
 
-    const blocks: PeriodBlock[] = [...pMap.values()].map((p) => {
-      const groups: Group[] = [...p.groups.entries()].map(([groupKey, g]) => {
-        const cards = [...g.cards.values()].sort((a, b) => a.label.localeCompare(b.label));
-        const brands = [...g.brands].sort();
-        const cells: Record<string, Cell> = {};
-        for (const [k, val] of g.cells) cells[k] = val;
+    const result: Group[] = [...gMap.entries()].map(([groupKey, g]) => {
+      const groupCards = [...g.cards.values()].sort((a, b) => a.label.localeCompare(b.label));
+      const columns = [...g.columns.values()].sort((a, b) => {
+        const t = TYPE_ORDER.indexOf(a.periodType) - TYPE_ORDER.indexOf(b.periodType);
+        if (t !== 0) return t;
+        const p = comparePeriodKeysDesc(a.periodType, a.periodKey, b.periodKey);
+        if (p !== 0) return p;
+        return a.brand.localeCompare(b.brand);
+      });
+      const cells: Record<string, Cell> = {};
+      for (const [k, val] of g.cells) cells[k] = val;
 
-        let pendingCount = 0;
-        for (const c of cards) for (const b of brands) if (!cells[cellKeyOf(c.key, b)]?.count) pendingCount++;
+      let pendingCount = 0;
+      for (const c of groupCards) for (const col of columns) if (!cells[cellKeyOf(c.key, col.key)]?.count) pendingCount++;
 
-        return { groupKey, bank: g.bank, cardType: g.cardType, cards, brands, cells, pendingCount };
-      }).sort((a, b) => `${a.bank} ${a.cardType}`.localeCompare(`${b.bank} ${b.cardType}`));
+      return { groupKey, bank: g.bank, cardType: g.cardType, cards: groupCards, columns, cells, pendingCount };
+    }).sort((a, b) => `${a.bank} ${a.cardType}`.localeCompare(`${b.bank} ${b.cardType}`));
 
-      const pendingCount = groups.reduce((s, g) => s + g.pendingCount, 0);
-      return { periodType: p.periodType, periodKey: p.periodKey, groups, pendingCount };
-    });
+    return result;
+  }, [vouchers, cardMeta, cards, year]);
 
-    blocks.sort((a, b) => {
-      const t = TYPE_ORDER.indexOf(a.periodType) - TYPE_ORDER.indexOf(b.periodType);
-      if (t !== 0) return t;
-      return comparePeriodKeysDesc(a.periodType, a.periodKey, b.periodKey);
-    });
-
-    return blocks;
-  }, [vouchers, cardMeta]);
-
-  // Years with at least one tracked period, plus the current year even if
-  // it has none yet, so the dropdown always has somewhere sensible to land.
-  const years = useMemo(() => {
-    const set = new Set<number>([new Date().getFullYear()]);
-    for (const p of periods) set.add(parsePeriodKey(p.periodType as PeriodType, p.periodKey).year);
-    return [...set].sort((a, b) => b - a);
-  }, [periods]);
-
-  const yearPeriods = useMemo(
-    () => periods.filter((p) => parsePeriodKey(p.periodType as PeriodType, p.periodKey).year === year),
-    [periods, year]
-  );
-
-  const totalPending = yearPeriods.reduce((s, p) => s + p.pendingCount, 0);
+  const totalPending = groups.reduce((s, g) => s + g.pendingCount, 0);
 
   const yearSelector = (
     <label className="flex items-center gap-2 text-sm">
@@ -169,7 +165,7 @@ export function CardStatsPage() {
     </label>
   );
 
-  if (periods.length === 0) {
+  if (!hasAnyPeriodic) {
     return (
       <div className="card p-8 text-center max-w-xl mx-auto mt-6">
         <div className="text-4xl mb-3">📊</div>
@@ -184,12 +180,12 @@ export function CardStatsPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       {/* Summary banner */}
       <div className="card p-4 flex flex-wrap items-center gap-x-8 gap-y-2">
         <div>
-          <div className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{yearPeriods.length}</div>
-          <div className="text-xs text-gray-500 dark:text-gray-400">Tracked periods</div>
+          <div className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{groups.length}</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400">Card programs tracked</div>
         </div>
         <div>
           <div className={`text-2xl font-semibold ${totalPending > 0 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>
@@ -198,15 +194,15 @@ export function CardStatsPage() {
           <div className="text-xs text-gray-500 dark:text-gray-400">Pending across all cards</div>
         </div>
         <p className="text-xs text-gray-400 dark:text-gray-500 max-w-md flex-1">
-          Cards are compared only within the same <strong>bank &amp; card type</strong>. A brand is
-          “expected” if any card in that group claimed it; cards missing it are marked
-          <span className="text-amber-600 dark:text-amber-400 font-medium"> Pending</span>. Tracks
-          claims only — redeeming a voucher doesn't change its status here.
+          Cards are compared only within the same <strong>bank &amp; card type</strong>. Each column is
+          one brand within one period (quarterly/half-yearly/yearly benefits are independent, so
+          claiming one never counts toward another). Tracks claims only — redeeming a voucher
+          doesn't change its status here.
         </p>
         {yearSelector}
       </div>
 
-      {yearPeriods.length === 0 && (
+      {groups.length === 0 && (
         <div className="card p-8 text-center max-w-xl mx-auto">
           <div className="text-4xl mb-3">📅</div>
           <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">No periods tracked for {year}</h3>
@@ -214,40 +210,24 @@ export function CardStatsPage() {
         </div>
       )}
 
-      {yearPeriods.map((p) => (
-        <div key={`${p.periodType}###${p.periodKey}`} className="space-y-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
-              {periodLabel(p.periodType, p.periodKey)}
-            </h2>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">
-              {PERIOD_TYPE_LABEL[p.periodType] ?? p.periodType}
-            </span>
-            {p.pendingCount > 0
-              ? <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 font-medium">{p.pendingCount} pending</span>
-              : <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 font-medium">all claimed ✓</span>}
-          </div>
-
-          {p.groups.map((g) => <GroupTable key={g.groupKey} group={g} />)}
-        </div>
-      ))}
+      {groups.map((g) => <GroupTable key={g.groupKey} group={g} />)}
     </div>
   );
 }
 
 function GroupTable({ group }: { group: Group }) {
-  const { bank, cardType, cards, brands, cells, pendingCount } = group;
+  const { bank, cardType, cards, columns, cells, pendingCount } = group;
 
   // A fully-claimed group has nothing left to act on, so collapse it by
-  // default once there's more than one group to scroll past — still one
-  // click away to double-check.
+  // default — still one click away to double-check.
   const [collapsed, setCollapsed] = useState(pendingCount === 0);
 
-  // A brand where every card in the group has claimed it adds nothing but
-  // clutter as more brands pile up — pull those columns out of the matrix
+  // A column where every card in the group has claimed it adds nothing but
+  // clutter as more brands/periods pile up — pull those out of the matrix
   // and summarize them in one line instead.
-  const clearedBrands = brands.filter((b) => cards.every((c) => cells[cellKeyOf(c.key, b)]?.count));
-  const visibleBrands = brands.filter((b) => !clearedBrands.includes(b));
+  const clearedCols = columns.filter((col) => cards.every((c) => cells[cellKeyOf(c.key, col.key)]?.count));
+  const clearedKeys = new Set(clearedCols.map((c) => c.key));
+  const visibleCols = columns.filter((col) => !clearedKeys.has(col.key));
 
   return (
     <div className="card overflow-hidden">
@@ -278,9 +258,9 @@ function GroupTable({ group }: { group: Group }) {
 
       {collapsed ? null : (
         <>
-      {clearedBrands.length > 0 && (
+      {clearedCols.length > 0 && (
         <div className="px-4 py-2 text-xs text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-900/15 border-b border-gray-100 dark:border-gray-800">
-          <span className="font-medium">✓ All cards clear:</span> {clearedBrands.join(", ")}
+          <span className="font-medium">✓ All cards clear:</span> {clearedCols.map((c) => `${c.brand} (${c.tag})`).join(", ")}
         </div>
       )}
 
@@ -290,25 +270,28 @@ function GroupTable({ group }: { group: Group }) {
           <thead>
             <tr className="text-left text-xs text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-800">
               <th className="px-4 py-2 font-medium sticky left-0 bg-white dark:bg-gray-900 z-10">Card</th>
-              {visibleBrands.map((b) => (
-                <th key={b} className="px-3 py-2 font-medium text-center whitespace-nowrap">{b}</th>
+              {visibleCols.map((col) => (
+                <th key={col.key} className="px-3 py-2 font-medium text-center whitespace-nowrap">
+                  <div>{col.brand}</div>
+                  <div className="text-[10px] text-gray-400 font-normal">{col.tag}</div>
+                </th>
               ))}
               <th className="px-4 py-2 font-medium">Pending for this card</th>
             </tr>
           </thead>
           <tbody>
             {cards.map((c) => {
-              const missing = brands.filter((b) => !cells[cellKeyOf(c.key, b)]?.count);
+              const missing = columns.filter((col) => !cells[cellKeyOf(c.key, col.key)]?.count);
               return (
                 <tr key={c.key} className="border-b border-gray-50 dark:border-gray-800/60 last:border-0">
                   <td className="px-4 py-2.5 sticky left-0 bg-white dark:bg-gray-900 z-10">
                     <div className="font-medium text-gray-800 dark:text-gray-200 whitespace-nowrap">{c.label}</div>
                     {c.owner && <div className="text-xs text-gray-400">{c.owner}</div>}
                   </td>
-                  {visibleBrands.map((b) => {
-                    const cell = cells[cellKeyOf(c.key, b)];
+                  {visibleCols.map((col) => {
+                    const cell = cells[cellKeyOf(c.key, col.key)];
                     return (
-                      <td key={b} className="px-3 py-2.5 text-center">
+                      <td key={col.key} className="px-3 py-2.5 text-center">
                         {cell?.count ? (
                           <span
                             title={cell.count > 1 ? `Claimed ${cell.count} times` : "Claimed"}
@@ -327,9 +310,9 @@ function GroupTable({ group }: { group: Group }) {
                       <span className="text-xs text-emerald-600 dark:text-emerald-400">None 🎉</span>
                     ) : (
                       <div className="flex flex-wrap gap-1">
-                        {missing.map((b) => (
-                          <span key={b} className="text-xs px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300">
-                            {b}
+                        {missing.map((col) => (
+                          <span key={col.key} className="text-xs px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300">
+                            {col.brand} ({col.tag})
                           </span>
                         ))}
                       </div>
