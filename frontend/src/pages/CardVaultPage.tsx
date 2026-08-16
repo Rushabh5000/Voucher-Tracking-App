@@ -7,11 +7,12 @@ import { CvvUsageLogModal } from "@/components/cardvault/CvvUsageLogModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { copyToClipboard } from "@/utils/formatters";
 import {
-  DEFAULT_COLUMNS, isSensitiveColumn, isCopyableColumn,
+  DEFAULT_COLUMNS, DONE_COLUMN, isSensitiveColumn, isCopyableColumn,
   parseWorkbook, downloadWorkbook, supportsFileSystemAccess,
   pickFileToOpen, pickFileToSave, writeToHandle,
   tryLoadDevVaultFile, saveDevVaultFile, openDevVaultFileInDesktopApp,
 } from "@/utils/cardVaultExcel";
+import { currentPeriodKey } from "@/utils/periods";
 
 // Card Vault: a fully local, Excel-backed store for full card details
 // (including card number + CVV). This page must NEVER import api/client.ts
@@ -149,8 +150,9 @@ function CopyCell({ value, onCopy, mono }: { value: string; onCopy: (e: React.Mo
 export function CardVaultPage() {
   const {
     columns, rows, fileName, fileHandle, devFileActive, dirty,
-    loadRows, ensureColumns, addRow, setHandle, markSaved, closeVault,
+    loadRows, ensureColumns, addRow, updateRow, setHandle, markSaved, closeVault,
   } = useCardVaultStore();
+  const thisQuarter = currentPeriodKey("QUARTERLY"); // e.g. "2026-Q3"
 
   const [modalOpen, setModalOpen]     = useState(false);
   const [closeConfirm, setCloseConfirm] = useState(false);
@@ -451,6 +453,7 @@ export function CardVaultPage() {
                 <tr className="border-b border-gray-100 dark:border-gray-800">
                   <th className="px-2 py-1.5" />
                   {columns.map((col) => {
+                    if (col === DONE_COLUMN) return <th key={col} className="px-2 py-1.5" />;
                     const sensitive = isSensitiveColumn(col);
                     return (
                       <th key={col} className="px-2 py-1.5">
@@ -479,17 +482,36 @@ export function CardVaultPage() {
                 ) : filteredRows.map(({ row: r, pos }) => {
                   const isRevealed = revealed.has(r.id);
                   const isHighlighted = r.id === highlightedId;
+                  // Stores the quarter it was marked in, not a plain boolean — so it
+                  // naturally reads as unchecked again once the quarter rolls over,
+                  // without any separate reset step.
+                  const isDone = (r.values[DONE_COLUMN] ?? "") === thisQuarter;
                   return (
                     <tr
                       key={r.id}
                       onClick={() => setHighlightedId(r.id)}
                       className={`border-b border-gray-50 dark:border-gray-800/60 last:border-0 cursor-pointer transition-colors ${
-                        isHighlighted ? "bg-accent-100 dark:bg-accent-500/30" : "hover:bg-gray-50 dark:hover:bg-gray-800/40"
+                        isDone
+                          ? "bg-gray-100 dark:bg-gray-800/60 text-gray-400 dark:text-gray-500"
+                          : isHighlighted ? "bg-accent-100 dark:bg-accent-500/30" : "hover:bg-gray-50 dark:hover:bg-gray-800/40"
                       }`}
                     >
-                      <td className={`px-3 py-2.5 text-gray-400 ${isHighlighted ? "border-l-4 border-accent-500 dark:border-accent-400" : ""}`}>{pos}</td>
+                      <td className={`px-3 py-2.5 text-gray-400 ${isHighlighted && !isDone ? "border-l-4 border-accent-500 dark:border-accent-400" : ""}`}>{pos}</td>
                       {columns.map((col) => {
                         const raw = r.values[col] ?? "";
+                        if (col === DONE_COLUMN) {
+                          return (
+                            <td key={col} className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+                              <input
+                                type="checkbox"
+                                checked={isDone}
+                                onChange={(e) => updateRow(r.id, { [DONE_COLUMN]: e.target.checked ? thisQuarter : "" })}
+                                title={isDone ? `Marked done for ${thisQuarter}` : "Mark as done for this quarter"}
+                                className="w-4 h-4 accent-accent-600 cursor-pointer"
+                              />
+                            </td>
+                          );
+                        }
                         if (isSensitiveColumn(col)) {
                           const isCvv = col.trim().toLowerCase() === "cvv";
                           const masked = raw
