@@ -344,6 +344,29 @@ export function CardVaultPage() {
     });
   }
 
+  // The Done checkbox is meant to survive a refresh/restart without you
+  // having to remember to hit Save — so if there's already a file open with
+  // a silent write path (CARD_VAULT_PATH, or a handle from the file picker),
+  // persist it to disk immediately instead of just marking the vault dirty.
+  // Falls back to the normal dirty-until-Save behavior when neither is
+  // available (download-only mode can't auto-save without repeatedly
+  // triggering a browser download on every click).
+  async function handleToggleDone(rowId: string, checked: boolean) {
+    updateRow(rowId, { [DONE_COLUMN]: checked ? thisQuarter : "" });
+    const state = useCardVaultStore.getState();
+    try {
+      if (state.devFileActive) {
+        const ok = await saveDevVaultFile(state.columns, state.rows);
+        if (ok) markSaved(); else toast.error("Couldn't auto-save — remember to hit Save");
+      } else if (state.fileHandle) {
+        await writeToHandle(state.fileHandle, state.columns, state.rows);
+        markSaved();
+      }
+    } catch {
+      toast.error("Couldn't auto-save — remember to hit Save");
+    }
+  }
+
   function requestClose() {
     if (dirty) setCloseConfirm(true);
     else closeVault();
@@ -505,7 +528,7 @@ export function CardVaultPage() {
                               <input
                                 type="checkbox"
                                 checked={isDone}
-                                onChange={(e) => updateRow(r.id, { [DONE_COLUMN]: e.target.checked ? thisQuarter : "" })}
+                                onChange={(e) => handleToggleDone(r.id, e.target.checked)}
                                 title={isDone ? `Marked done for ${thisQuarter}` : "Mark as done for this quarter"}
                                 className="w-4 h-4 accent-accent-600 cursor-pointer"
                               />
