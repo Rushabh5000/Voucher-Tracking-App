@@ -162,6 +162,30 @@ router.patch("/:id", async (req: Request, res: Response, next: NextFunction) => 
       },
     });
 
+    // Vouchers remember which card they came from as a plain "bank | last4"
+    // label (sourceProgramOrCard), snapshotted at the time they were added.
+    // If this edit changes the bank or last 4 digits, that label goes stale
+    // and Card Stats can no longer match those vouchers back to this card —
+    // showing them as an orphaned "Unknown type" group instead. Re-point
+    // every voucher that had the old label at the new one so the mapping
+    // survives the edit. sourceProgramOrCard is encrypted non-deterministically,
+    // so this decrypts and compares in app code, same as the duplicate checks.
+    const oldLabel = `${existing.bank} | ${decrypt(existing.lastFourDigits)}`;
+    const newLabel = `${effBank} | ${effLast4}`;
+    if (oldLabel !== newLabel) {
+      const userVouchers = await prisma.voucher.findMany({ where: userWhere(req) });
+      const toRelink = userVouchers.filter((v) => v.sourceProgramOrCard && decrypt(v.sourceProgramOrCard) === oldLabel);
+      await Promise.all(
+        toRelink.map((v) => prisma.voucher.update({ where: { id: v.id }, data: { sourceProgramOrCard: encrypt(newLabel) } }))
+      );
+      if (toRelink.length > 0) {
+        auditWriter(req, startAt)(
+          "Relinked vouchers after card edit", "Voucher", null,
+          `${toRelink.length} voucher(s): "${oldLabel}" → "${newLabel}"`
+        );
+      }
+    }
+
     auditWriter(req, startAt)("Updated card", "Card", updated.id, cardDetails(updated));
     res.json({ data: formatCard(updated) });
   } catch (e) { next(e); }
