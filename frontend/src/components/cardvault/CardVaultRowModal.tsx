@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { Modal } from "@/components/ui/Modal";
-import { isSensitiveColumn, type VaultRow } from "@/utils/cardVaultExcel";
+import { DONE_COLUMN, isSensitiveColumn, type VaultRow } from "@/utils/cardVaultExcel";
 
 interface CardVaultRowModalProps {
   open: boolean;
@@ -16,6 +16,8 @@ interface CardVaultRowModalProps {
 // Fields are fully dynamic: whatever columns the vault currently has (driven
 // by the opened Excel file) is exactly what's editable here.
 export function CardVaultRowModal({ open, onClose, onSave, columns, existing }: CardVaultRowModalProps) {
+  // "Done" is a checkbox managed from the table itself, not a field to fill in here.
+  const fields = columns.filter((c) => c !== DONE_COLUMN);
   const [form, setForm]   = useState<Record<string, string>>({});
   const [error, setErrorState] = useState("");
   // Every validation error also surfaces as a toast (top-right) — the inline
@@ -36,7 +38,7 @@ export function CardVaultRowModal({ open, onClose, onSave, columns, existing }: 
     setForm((f) => ({ ...f, [col]: e.target.value }));
 
   function handleSubmit() {
-    if (columns.length > 0 && columns.every((c) => !form[c]?.trim())) {
+    if (fields.length > 0 && fields.every((c) => !form[c]?.trim())) {
       setError("Enter at least one field.");
       return;
     }
@@ -59,13 +61,13 @@ export function CardVaultRowModal({ open, onClose, onSave, columns, existing }: 
       }
     >
       <div className="space-y-4">
-        {columns.length === 0 && (
+        {fields.length === 0 && (
           <p className="text-sm text-gray-500 dark:text-gray-400">
             This vault has no columns yet — open an Excel file with a header row, or add columns first.
           </p>
         )}
         <div className="grid grid-cols-2 gap-4">
-          {columns.map((col) => {
+          {fields.map((col) => {
             const sensitive = isSensitiveColumn(col);
             return (
               <div key={col}>
