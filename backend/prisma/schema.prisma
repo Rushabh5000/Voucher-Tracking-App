@@ -1,5 +1,17 @@
 // Prisma schema for Voucher Tracker v2
 // Database: PostgreSQL
+//
+// IMPORTANT — RLS: every table below must have Row Level Security enabled
+// (`ALTER TABLE "X" ENABLE ROW LEVEL SECURITY;`) so anon/authenticated
+// Supabase API keys can't read it directly — the backend itself bypasses RLS
+// via the superuser pooler connection, so this only blocks outside access.
+// `npm run db:push` runs `prisma db push`, which ONLY diffs this file's
+// tables/columns/indexes — it silently ignores raw SQL like RLS statements
+// written in a migrations/*.sql file, so adding one there does NOT apply it.
+// After adding any new model, run its ENABLE ROW LEVEL SECURITY statement
+// by hand against the real DB, then run `npm run db:check-rls` to confirm
+// every public table has it on. (CvvUsageLog shipped without RLS for a
+// while because of exactly this gap — caught by a Supabase advisory email.)
 
 generator client {
   provider = "prisma-client-js"
