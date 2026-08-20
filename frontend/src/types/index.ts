@@ -115,6 +115,7 @@ export type Page =
   | "cards"
   | "cardvault"
   | "cardstats"
+  | "pendingCoupons"
   | "analytics"
   | "export"
   | "audit"
