@@ -8,7 +8,7 @@ import { BookingIdSelect } from "./BookingIdSelect";
 import { PeriodSelector } from "./PeriodSelector";
 import { currentPeriodKey } from "@/utils/periods";
 import { useCardStore } from "@/store/cardStore";
-import type { CvvUsageLog } from "@/api/client";
+import { cvvUsageApi, type CvvUsageLog } from "@/api/client";
 import type { Card } from "@/types";
 
 // Pulls "bank" and "last 4 digits" back out of a Card Vault row label like
@@ -23,6 +23,10 @@ function parseCardLabel(label: string): { bank: string; last4: string } {
 interface AddVoucherModalProps {
   open: boolean;
   onClose: () => void;
+  // Pre-fills Booking ID on open and auto-fills brand/source card from its
+  // CVV log entry, same as picking it from BookingIdSelect — used by the
+  // Pending Coupons page's "+ Add voucher" action.
+  prefillBookingId?: string;
 }
 
 // Returns today's date as YYYY-MM-DD
@@ -76,7 +80,7 @@ function cardLabel(card: Card): string {
   return `${card.bank} | ${card.lastFourDigits}`;
 }
 
-export function AddVoucherModal({ open, onClose }: AddVoucherModalProps) {
+export function AddVoucherModal({ open, onClose, prefillBookingId }: AddVoucherModalProps) {
   const { addVoucher, vouchers } = useVoucherStore();
   const { cards } = useCardStore();
 
@@ -99,8 +103,13 @@ export function AddVoucherModal({ open, onClose }: AddVoucherModalProps) {
       , null);
       setForm(blankForm(lastAdded?.brand ?? ""));
       setError("");
+
+      if (prefillBookingId) {
+        setForm((f) => ({ ...f, bookingId: prefillBookingId }));
+        cvvUsageApi.lookup(prefillBookingId).then((match) => { if (match) applyCvvLogMatch(match); }).catch(() => {});
+      }
     }
-  }, [open]);
+  }, [open, prefillBookingId]);
 
   // When sourceCardId changes, auto-fill disabled fields from the matching card
   const applyCardFields = useCallback((cardId: string) => {

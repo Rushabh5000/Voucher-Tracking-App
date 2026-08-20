@@ -13,6 +13,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "cards",     label: "Cards Summary", icon: "💳" },
   { id: "cardvault", label: "Card Vault",    icon: "🔐" },
   { id: "cardstats", label: "Card Stats",    icon: "🔁" },
+  { id: "pendingCoupons", label: "Pending Coupons", icon: "⏳" },
   { id: "analytics", label: "Analytics",  icon: "📊" },
   { id: "export",    label: "Export",     icon: "⬇" },
   { id: "audit",     label: "Audit Log",  icon: "📋" },

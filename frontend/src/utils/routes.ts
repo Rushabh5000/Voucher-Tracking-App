@@ -10,6 +10,7 @@ export const PAGE_PATHS: Record<Page, string> = {
   cards:     "/cards",
   cardvault: "/card-vault",
   cardstats: "/card-stats",
+  pendingCoupons: "/pending-coupons",
   analytics: "/analytics",
   export:    "/export",
   audit:     "/audit",

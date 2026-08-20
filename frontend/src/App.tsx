@@ -14,6 +14,7 @@ import { DashboardPage }  from "@/pages/DashboardPage";
 import { VouchersPage }   from "@/pages/VouchersPage";
 import { CardsPage }      from "@/pages/CardsPage";
 import { CardStatsPage }  from "@/pages/CardStatsPage";
+import { PendingCouponsPage } from "@/pages/PendingCouponsPage";
 import { PAGE_PATHS, pageForPath } from "@/utils/routes";
 
 // Lazy-loaded: pulls in the `xlsx` library (~350KB gzipped), so it's kept out
@@ -36,6 +37,7 @@ const PAGE_TITLES: Record<string, { title: string; subtitle?: string }> = {
   cards:     { title: "Cards Summary", subtitle: "Manage your credit and debit cards" },
   cardvault: { title: "Card Vault", subtitle: "Full card details, stored only in your local Excel file — never online" },
   cardstats: { title: "Card Stats", subtitle: "Compare recurring vouchers across cards, spot what's pending" },
+  pendingCoupons: { title: "Pending Coupons", subtitle: "Booking IDs logged in Card Vault with no voucher added yet" },
   analytics: { title: "Analytics", subtitle: "Charts and trends" },
   export:    { title: "Export", subtitle: "Excel, PDF, and email reports" },
   audit:     { title: "Audit Log", subtitle: "Every API call, recorded" },
@@ -51,6 +53,7 @@ export default function App() {
 
   const [authView, setAuthView] = useState<"login" | "register">("login");
   const [addOpen, setAddOpen] = useState(false);
+  const [prefillBookingId, setPrefillBookingId] = useState("");
   const [getOpen, setGetOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editingVoucherId, setEditingVoucherId] = useState<string>("");
@@ -145,6 +148,10 @@ export default function App() {
           <Route path={PAGE_PATHS.wordcloud} element={gated(<WordCloudPage onEdit={openEdit} />)} />
           <Route path={PAGE_PATHS.cards}     element={gated(<CardsPage onEditVoucher={openEdit} />)} />
           <Route path={PAGE_PATHS.cardstats} element={gated(<CardStatsPage />)} />
+          <Route
+            path={PAGE_PATHS.pendingCoupons}
+            element={gated(<PendingCouponsPage onAddVoucher={(bookingId) => { setPrefillBookingId(bookingId); setAddOpen(true); }} />)}
+          />
           <Route path={PAGE_PATHS.analytics} element={gated(<AnalyticsPage />)} />
           <Route path={PAGE_PATHS.export}    element={gated(<ExportPage />)} />
           <Route path={PAGE_PATHS.audit}     element={gated(<AuditPage />)} />
@@ -153,7 +160,7 @@ export default function App() {
         </Routes>
       </Layout>
 
-      <AddVoucherModal open={addOpen} onClose={() => setAddOpen(false)} />
+      <AddVoucherModal open={addOpen} onClose={() => { setAddOpen(false); setPrefillBookingId(""); }} prefillBookingId={prefillBookingId} />
       <EditVoucherModal open={editOpen} onClose={() => { setEditOpen(false); setEditingVoucherId(""); }} voucherId={editingVoucherId} />
       <VoucherDetailModal open={viewOpen} onClose={() => { setViewOpen(false); setViewingVoucherId(""); }} voucherId={viewingVoucherId} onEdit={openEdit} />
       <GetVoucherModal open={getOpen} onClose={() => setGetOpen(false)} />
