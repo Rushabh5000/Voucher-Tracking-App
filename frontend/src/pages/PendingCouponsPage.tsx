@@ -1,8 +1,17 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { useVoucherStore } from "@/store/voucherStore";
+import { useCardStore } from "@/store/cardStore";
 import { cvvUsageApi, type CvvUsageLog } from "@/api/client";
 import { fmtDateTime, copyToClipboard } from "@/utils/formatters";
+
+function emailForLabel(cardLabel: string, cards: ReturnType<typeof useCardStore.getState>["cards"]): string {
+  const m = cardLabel.match(/••••\s*(\d{4})/);
+  if (!m) return "";
+  const last4 = m[1];
+  const card = cards.find((c) => c.lastFourDigits === last4);
+  return card?.email ?? "";
+}
 
 interface PendingCouponsPageProps {
   onAddVoucher: (bookingId: string) => void;
@@ -14,6 +23,7 @@ interface PendingCouponsPageProps {
 // never added here.
 export function PendingCouponsPage({ onAddVoucher }: PendingCouponsPageProps) {
   const { vouchers } = useVoucherStore();
+  const { cards } = useCardStore();
   const [logs, setLogs] = useState<CvvUsageLog[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -69,6 +79,7 @@ export function PendingCouponsPage({ onAddVoucher }: PendingCouponsPageProps) {
                 <th className="px-4 py-2 font-medium">Card</th>
                 <th className="px-3 py-2 font-medium">Brand</th>
                 <th className="px-3 py-2 font-medium">Booking ID</th>
+                <th className="px-3 py-2 font-medium">Email</th>
                 <th className="px-3 py-2 font-medium">Logged</th>
                 <th className="px-4 py-2 font-medium" />
               </tr>
@@ -81,6 +92,9 @@ export function PendingCouponsPage({ onAddVoucher }: PendingCouponsPageProps) {
                     {l.brand || <span className="text-gray-300 dark:text-gray-600">—</span>}
                   </td>
                   <td className="px-3 py-2.5 font-mono whitespace-nowrap">{l.bookingId}</td>
+                  <td className="px-3 py-2.5 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                    {emailForLabel(l.cardLabel, cards) || <span className="text-gray-300 dark:text-gray-600">—</span>}
+                  </td>
                   <td className="px-3 py-2.5 text-xs text-gray-400 whitespace-nowrap">{fmtDateTime(l.createdAt)}</td>
                   <td className="px-4 py-2.5 text-right whitespace-nowrap">
                     <div className="flex items-center justify-end gap-3">
