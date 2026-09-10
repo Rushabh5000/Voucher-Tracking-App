@@ -4,3 +4,5 @@ backend/migrate.js
 test-results/**
 frontend/.env.local
 frontend/.env*.local
+# Claude Code session/worktree dir
+.claude/
