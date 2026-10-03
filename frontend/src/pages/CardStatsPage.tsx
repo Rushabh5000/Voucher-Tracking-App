@@ -49,10 +49,19 @@ function cardIdentity(v: Voucher): CardInfo {
   return { key: `${label}::${owner}`, label, owner };
 }
 
+function currentQuarter(): number {
+  return Math.floor(new Date().getMonth() / 3) + 1;
+}
+
+// Which half-year contains a given quarter (Q1,Q2 → H1; Q3,Q4 → H2)
+function halfForQuarter(q: number): number { return q <= 2 ? 1 : 2; }
+
 export function CardStatsPage() {
   const { vouchers } = useVoucherStore();
   const { cards } = useCardStore();
   const [year, setYear] = useState(() => new Date().getFullYear());
+  // null = show all quarters; number = filter to that quarter
+  const [quarter, setQuarter] = useState<number | null>(() => currentQuarter());
 
   // Map "Bank | last4" → { bank, cardType } so each voucher can find its card program
   const cardMeta = useMemo(() => {
@@ -75,10 +84,18 @@ export function CardStatsPage() {
   const hasAnyPeriodic = useMemo(() => vouchers.some((v) => v.periodType), [vouchers]);
 
   const groups = useMemo<Group[]>(() => {
-    // Only vouchers tagged with a recurring period, within the selected year, participate.
+    // Only vouchers tagged with a recurring period, within the selected year (and quarter
+    // if one is selected), participate.
     const periodic = vouchers.filter((v) => {
       if (!v.periodType) return false;
-      return parsePeriodKey(v.periodType as PeriodType, v.periodKey).year === year;
+      const parsed = parsePeriodKey(v.periodType as PeriodType, v.periodKey);
+      if (parsed.year !== year) return false;
+      if (quarter !== null) {
+        if (v.periodType === "QUARTERLY" && parsed.sub !== quarter) return false;
+        if (v.periodType === "HALF_YEARLY" && parsed.sub !== halfForQuarter(quarter)) return false;
+        // YEARLY: always include
+      }
+      return true;
     });
 
     const gMap = new Map<string, {
@@ -148,21 +165,37 @@ export function CardStatsPage() {
     }).sort((a, b) => `${a.bank} ${a.cardType}`.localeCompare(`${b.bank} ${b.cardType}`));
 
     return result;
-  }, [vouchers, cardMeta, cards, year]);
+  }, [vouchers, cardMeta, cards, year, quarter]);
 
   const totalPending = groups.reduce((s, g) => s + g.pendingCount, 0);
 
-  const yearSelector = (
-    <label className="flex items-center gap-2 text-sm">
-      <span className="text-gray-500 dark:text-gray-400">Year</span>
-      <select
-        className="input py-1.5 w-auto"
-        value={year}
-        onChange={(e) => setYear(Number(e.target.value))}
-      >
-        {years.map((y) => <option key={y} value={y}>{y}</option>)}
-      </select>
-    </label>
+  const selectors = (
+    <div className="flex items-center gap-3 text-sm">
+      <label className="flex items-center gap-2">
+        <span className="text-gray-500 dark:text-gray-400">Quarter</span>
+        <select
+          className="input py-1.5 w-auto"
+          value={quarter ?? "all"}
+          onChange={(e) => setQuarter(e.target.value === "all" ? null : Number(e.target.value))}
+        >
+          <option value="all">All</option>
+          <option value={1}>Q1 (Jan–Mar)</option>
+          <option value={2}>Q2 (Apr–Jun)</option>
+          <option value={3}>Q3 (Jul–Sep)</option>
+          <option value={4}>Q4 (Oct–Dec)</option>
+        </select>
+      </label>
+      <label className="flex items-center gap-2">
+        <span className="text-gray-500 dark:text-gray-400">Year</span>
+        <select
+          className="input py-1.5 w-auto"
+          value={year}
+          onChange={(e) => setYear(Number(e.target.value))}
+        >
+          {years.map((y) => <option key={y} value={y}>{y}</option>)}
+        </select>
+      </label>
+    </div>
   );
 
   if (!hasAnyPeriodic) {
@@ -199,14 +232,16 @@ export function CardStatsPage() {
           claiming one never counts toward another). Tracks claims only — redeeming a voucher
           doesn't change its status here.
         </p>
-        {yearSelector}
+        {selectors}
       </div>
 
       {groups.length === 0 && (
         <div className="card p-8 text-center max-w-xl mx-auto">
           <div className="text-4xl mb-3">📅</div>
-          <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">No periods tracked for {year}</h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Try a different year from the dropdown above.</p>
+          <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">
+            No periods tracked for {quarter !== null ? `Q${quarter} ` : ""}{year}
+          </h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Try a different quarter or year from the dropdowns above.</p>
         </div>
       )}
 
