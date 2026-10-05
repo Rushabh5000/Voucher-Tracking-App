@@ -192,7 +192,13 @@ export function CardVaultPage() {
     let list = rows.map((r, i) => ({ row: r, pos: i + 1 }));
     if (active.length > 0) {
       list = list.filter(({ row }) =>
-        active.every(([col, raw]) => (row.values[col] ?? "").toLowerCase().includes(raw.trim().toLowerCase()))
+        active.every(([col, raw]) => {
+          const cellVal = (row.values[col] ?? "").toLowerCase();
+          const filterVal = raw.trim().toLowerCase();
+          // Bank uses exact match so "Punjab National Bank" doesn't also match "OP_Punjab National Bank"
+          if (col.trim().toLowerCase() === "bank") return cellVal === filterVal;
+          return cellVal.includes(filterVal);
+        })
       );
     }
     if (sort) {

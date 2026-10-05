@@ -140,7 +140,8 @@ export function CvvUsageModal({ open, onClose, cardLabel, anchorRect }: CvvUsage
             value={bookingId}
             onChange={(e) => { setBookingId(e.target.value); setError(""); }}
             placeholder="e.g. order/booking reference"
-            autoComplete="off"
+            autoComplete="one-time-code"
+            name="cvv-booking-ref"
           />
         </div>
         {error && (
