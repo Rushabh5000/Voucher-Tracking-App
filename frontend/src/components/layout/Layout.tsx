@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Sidebar } from "./Sidebar";
+import { GlobalSearch } from "./GlobalSearch";
 import { useUIStore }  from "@/store/uiStore";
 import { useAuthStore } from "@/store/authStore";
 
@@ -68,11 +69,12 @@ export function Layout({ title, subtitle, actions, children }: LayoutProps) {
             >
               ☰
             </button>
-            <div className="flex-1">
+            <div className="shrink-0">
               <h1 className="font-semibold text-base text-gray-900 dark:text-gray-100">{title}</h1>
               {subtitle && <p className="text-xs text-gray-400">{subtitle}</p>}
             </div>
-            {actions && <div className="flex items-center gap-2">{actions}</div>}
+            <GlobalSearch />
+            {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
           </div>
         </header>
 
