@@ -15,6 +15,8 @@ interface Result {
   badge?: string;
   badgeCls?: string;
   path: string;
+  // passed as location.state so the destination page can act on the specific item
+  navState?: Record<string, string>;
 }
 
 const MAX_PER_TYPE = 5;
@@ -62,6 +64,7 @@ export function GlobalSearch() {
         badge: v.status.charAt(0) + v.status.slice(1).toLowerCase(),
         badgeCls: statusCls,
         path: PAGE_PATHS.vouchers,
+        navState: { openVoucherId: v.id },
       });
       vCount++;
     }
@@ -163,7 +166,7 @@ export function GlobalSearch() {
   }
 
   const go = useCallback((r: Result) => {
-    navigate(r.path);
+    navigate(r.path, r.navState ? { state: r.navState } : undefined);
     setOpen(false);
     setQuery("");
     setCursor(-1);

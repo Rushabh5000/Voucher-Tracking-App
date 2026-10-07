@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { useVoucherStore } from "@/store/voucherStore";
 import { useCardStore } from "@/store/cardStore";
 import { VoucherCard } from "@/components/vouchers/VoucherCard";
@@ -14,10 +15,21 @@ interface VouchersPageProps {
 export function VouchersPage({ onAdd, onGetVoucher, onEdit, onView }: VouchersPageProps) {
   const { vouchers, brands } = useVoucherStore();
   const { cards }            = useCardStore();
+  const location             = useLocation();
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [brandFilter,  setBrandFilter]  = useState("ALL");
   const [cardFilter,   setCardFilter]   = useState("ALL");
   const [query,        setQuery]        = useState("");
+
+  // When global search navigates here with a specific voucher, open its modal
+  useEffect(() => {
+    const id = (location.state as any)?.openVoucherId;
+    if (id) {
+      onEdit(id);
+      // Clear state so re-renders don't re-open the modal
+      window.history.replaceState({}, "");
+    }
+  }, [location.state]);
 
   // Find the selected card object for matching
   const selectedCard = useMemo(
