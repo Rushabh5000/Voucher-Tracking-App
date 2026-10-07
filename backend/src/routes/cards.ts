@@ -162,27 +162,40 @@ router.patch("/:id", async (req: Request, res: Response, next: NextFunction) => 
       },
     });
 
-    // Vouchers remember which card they came from as a plain "bank | last4"
-    // label (sourceProgramOrCard), snapshotted at the time they were added.
-    // If this edit changes the bank or last 4 digits, that label goes stale
-    // and Card Stats can no longer match those vouchers back to this card —
-    // showing them as an orphaned "Unknown type" group instead. Re-point
-    // every voucher that had the old label at the new one so the mapping
-    // survives the edit. sourceProgramOrCard is encrypted non-deterministically,
-    // so this decrypts and compares in app code, same as the duplicate checks.
+    // Vouchers snapshot the card's label ("bank | last4") and owner at creation.
+    // If this edit changes either, re-sync every linked voucher so Card Stats
+    // can still match them back to this card. Both fields are encrypted
+    // non-deterministically, so we decrypt-compare in app code.
     const oldLabel = `${existing.bank} | ${decrypt(existing.lastFourDigits)}`;
     const newLabel = `${effBank} | ${effLast4}`;
-    if (oldLabel !== newLabel) {
+    const oldOwner = decrypt(existing.accountOwner);
+    const newOwner = accountOwner?.trim() ?? oldOwner;
+    const labelChanged = oldLabel !== newLabel;
+    const ownerChanged = oldOwner !== newOwner;
+
+    if (labelChanged || ownerChanged) {
       const userVouchers = await prisma.voucher.findMany({ where: userWhere(req) });
-      const toRelink = userVouchers.filter((v) => v.sourceProgramOrCard && decrypt(v.sourceProgramOrCard) === oldLabel);
-      await Promise.all(
-        toRelink.map((v) => prisma.voucher.update({ where: { id: v.id }, data: { sourceProgramOrCard: encrypt(newLabel) } }))
+      // All vouchers linked to this card are identified by the OLD label
+      const linked = userVouchers.filter(
+        (v) => v.sourceProgramOrCard && decrypt(v.sourceProgramOrCard) === oldLabel
       );
-      if (toRelink.length > 0) {
-        auditWriter(req, startAt)(
-          "Relinked vouchers after card edit", "Voucher", null,
-          `${toRelink.length} voucher(s): "${oldLabel}" → "${newLabel}"`
-        );
+      if (linked.length > 0) {
+        const patch: any = {};
+        if (labelChanged) patch.sourceProgramOrCard = encrypt(newLabel);
+        if (ownerChanged) patch.cardOwner           = encrypt(newOwner);
+        await Promise.all(linked.map((v) => prisma.voucher.update({ where: { id: v.id }, data: patch })));
+        if (labelChanged) {
+          auditWriter(req, startAt)(
+            "Relinked vouchers after card edit", "Voucher", null,
+            `${linked.length} voucher(s): label "${oldLabel}" → "${newLabel}"`
+          );
+        }
+        if (ownerChanged) {
+          auditWriter(req, startAt)(
+            "Re-synced voucher owners after card edit", "Voucher", null,
+            `${linked.length} voucher(s): owner "${oldOwner}" → "${newOwner}" on "${newLabel}"`
+          );
+        }
       }
     }
 

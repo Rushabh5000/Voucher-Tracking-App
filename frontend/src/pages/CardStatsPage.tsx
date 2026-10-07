@@ -42,11 +42,13 @@ interface Group {
 
 const cellKeyOf = (cardKey: string, colKey: string) => `${cardKey}|||${colKey}`;
 
-// The specific card a voucher belongs to (identity within a group)
+// The specific card a voucher belongs to (identity within a group).
+// Key is label-only (no owner) so a stale cardOwner snapshot on an old
+// voucher never breaks the match — the displayed owner always comes from
+// the live card store via the backfill below.
 function cardIdentity(v: Voucher): CardInfo {
   const label = v.sourceProgramOrCard || v.cardName || "No source card";
-  const owner = v.cardOwner || "";
-  return { key: `${label}::${owner}`, label, owner };
+  return { key: label, label, owner: "" };
 }
 
 function currentQuarter(): number {
@@ -141,8 +143,9 @@ export function CardStatsPage() {
         if (c.bank !== g.bank || c.cardType !== g.cardType) continue;
         const label = `${c.bank} | ${c.lastFourDigits}`;
         const owner = c.accountOwner || "";
-        const key = `${label}::${owner}`;
-        if (!g.cards.has(key)) g.cards.set(key, { key, label, owner });
+        // Always overwrite: backfill uses the live card store so the displayed
+        // owner is always current, even if a voucher's cardOwner snapshot is stale.
+        g.cards.set(label, { key: label, label, owner });
       }
     }
 
