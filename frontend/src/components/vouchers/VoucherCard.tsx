@@ -18,11 +18,16 @@ export function VoucherCard({ voucher, onView, onEdit }: VoucherCardProps) {
   const soon    = isExpiringSoon(voucher);
   const expired = voucher.status === "EXPIRED";
 
-  async function handleCopyCode() {
-    const ok = await copyToClipboard(voucher.voucherCode);
-    if (ok) toast.success("Code copied to clipboard");
-    else toast.error("Couldn't copy code");
+  async function handleCopy(text: string, label: string) {
+    const ok = await copyToClipboard(text);
+    if (ok) toast.success(`${label} copied`);
+    else toast.error(`Couldn't copy ${label.toLowerCase()}`);
   }
+
+  // Detect "ID/PIN:XXXX" format — split into copyable parts
+  const pinMatch = voucher.voucherCode.match(/^(.+?)\/PIN:(.+)$/);
+  const codeId  = pinMatch ? pinMatch[1] : voucher.voucherCode;
+  const codePin = pinMatch ? pinMatch[2] : null;
 
   // Primary display: brand is main heading, title is secondary if present
   const displayTitle = voucher.title || voucher.brand;
@@ -53,16 +58,29 @@ export function VoucherCard({ voucher, onView, onEdit }: VoucherCardProps) {
 
             {/* Meta row */}
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-400 dark:text-gray-500 mt-1">
-              <span>
-                Code:{" "}
+              <span className="flex items-center gap-1.5 flex-wrap">
+                <span>Code:</span>
                 <button
                   type="button"
-                  onClick={handleCopyCode}
-                  title="Click to copy"
+                  onClick={() => handleCopy(codeId, "Code")}
+                  title="Copy code"
                   className="font-mono text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded hover:bg-accent-100 dark:hover:bg-accent-900/40 hover:text-accent-700 dark:hover:text-accent-300 transition-colors cursor-pointer"
                 >
-                  {voucher.voucherCode} <span className="opacity-50">⧉</span>
+                  {codeId} <span className="opacity-50">⧉</span>
                 </button>
+                {codePin && (
+                  <>
+                    <span className="text-gray-300 dark:text-gray-600">/</span>
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(codePin, "PIN")}
+                      title="Copy PIN"
+                      className="font-mono text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded hover:bg-accent-100 dark:hover:bg-accent-900/40 hover:text-accent-700 dark:hover:text-accent-300 transition-colors cursor-pointer"
+                    >
+                      PIN:{codePin} <span className="opacity-50">⧉</span>
+                    </button>
+                  </>
+                )}
               </span>
               {sourceLabel && <span>Source: {sourceLabel}</span>}
               {voucher.cardOwner && <span>Owner: {voucher.cardOwner}</span>}
