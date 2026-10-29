@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, Fragment } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import toast from "react-hot-toast";
 import { useCardVaultStore } from "@/store/cardVaultStore";
 import { CardVaultRowModal } from "@/components/cardvault/CardVaultRowModal";
@@ -212,28 +212,6 @@ export function CardVaultPage() {
     }
     return list;
   }, [rows, filters, sort]);
-
-  // Email column used to visually group rows — same-email cards stay adjacent
-  // regardless of which sort column is active.
-  const emailCol = useMemo(() =>
-    columns.find((c) => c.trim().toLowerCase() === "email") ?? null,
-    [columns]
-  );
-
-  // Group filteredRows by email for display. Within each group the sort order
-  // from filteredRows is preserved; groups themselves are sorted alphabetically.
-  const displayGroups = useMemo(() => {
-    if (!emailCol) return [{ email: null as string | null, items: filteredRows }];
-    const map = new Map<string, typeof filteredRows>();
-    for (const item of filteredRows) {
-      const email = (item.row.values[emailCol] ?? "").trim();
-      if (!map.has(email)) map.set(email, []);
-      map.get(email)!.push(item);
-    }
-    return [...map.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([email, items]) => ({ email: email || "(no email)", items }));
-  }, [filteredRows, emailCol]);
 
   function setFilter(col: string, value: string) {
     setFilters((f) => ({ ...f, [col]: value }));
@@ -531,21 +509,11 @@ export function CardVaultPage() {
                       No cards match your filters.
                     </td>
                   </tr>
-                ) : displayGroups.map(({ email, items }) => (
-                  <Fragment key={email ?? "_all"}>
-                    {emailCol && (
-                      <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-800/70">
-                        <td colSpan={columns.length + 1} className="px-3 py-1.5 text-xs text-gray-500 dark:text-gray-400">
-                          <span className="font-medium">📧 {email}</span>
-                          <span className="ml-1.5 text-gray-400 dark:text-gray-600">({items.length})</span>
-                        </td>
-                      </tr>
-                    )}
-                    {items.map(({ row: r, pos }) => {
-                      const isRevealed = revealed.has(r.id);
-                      const isHighlighted = r.id === highlightedId;
-                      const isDone = (r.values[DONE_COLUMN] ?? "") === thisQuarter;
-                      return (
+                ) : filteredRows.map(({ row: r, pos }) => {
+                    const isRevealed = revealed.has(r.id);
+                    const isHighlighted = r.id === highlightedId;
+                    const isDone = (r.values[DONE_COLUMN] ?? "") === thisQuarter;
+                    return (
                         <tr
                           key={r.id}
                           onClick={() => setHighlightedId(r.id)}
@@ -610,10 +578,8 @@ export function CardVaultPage() {
                             );
                           })}
                         </tr>
-                      );
-                    })}
-                  </Fragment>
-                ))}
+                    );
+                  })}
               </tbody>
             </table>
           </div>
