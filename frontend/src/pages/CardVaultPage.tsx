@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, Fragment } from "react";
 import toast from "react-hot-toast";
 import { useCardVaultStore } from "@/store/cardVaultStore";
 import { CardVaultRowModal } from "@/components/cardvault/CardVaultRowModal";
@@ -212,6 +212,28 @@ export function CardVaultPage() {
     }
     return list;
   }, [rows, filters, sort]);
+
+  // Email column used to visually group rows — same-email cards stay adjacent
+  // regardless of which sort column is active.
+  const emailCol = useMemo(() =>
+    columns.find((c) => c.trim().toLowerCase() === "email") ?? null,
+    [columns]
+  );
+
+  // Group filteredRows by email for display. Within each group the sort order
+  // from filteredRows is preserved; groups themselves are sorted alphabetically.
+  const displayGroups = useMemo(() => {
+    if (!emailCol) return [{ email: null as string | null, items: filteredRows }];
+    const map = new Map<string, typeof filteredRows>();
+    for (const item of filteredRows) {
+      const email = (item.row.values[emailCol] ?? "").trim();
+      if (!map.has(email)) map.set(email, []);
+      map.get(email)!.push(item);
+    }
+    return [...map.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([email, items]) => ({ email: email || "(no email)", items }));
+  }, [filteredRows, emailCol]);
 
   function setFilter(col: string, value: string) {
     setFilters((f) => ({ ...f, [col]: value }));
@@ -508,80 +530,89 @@ export function CardVaultPage() {
                       No cards match your filters.
                     </td>
                   </tr>
-                ) : filteredRows.map(({ row: r, pos }) => {
-                  const isRevealed = revealed.has(r.id);
-                  const isHighlighted = r.id === highlightedId;
-                  // Stores the quarter it was marked in, not a plain boolean — so it
-                  // naturally reads as unchecked again once the quarter rolls over,
-                  // without any separate reset step.
-                  const isDone = (r.values[DONE_COLUMN] ?? "") === thisQuarter;
-                  return (
-                    <tr
-                      key={r.id}
-                      onClick={() => setHighlightedId(r.id)}
-                      className={`border-b border-gray-50 dark:border-gray-800/60 last:border-0 cursor-pointer transition-colors ${
-                        isDone
-                          ? "bg-gray-100 dark:bg-gray-800/60 text-gray-400 dark:text-gray-500"
-                          : isHighlighted ? "bg-accent-100 dark:bg-accent-500/30" : "hover:bg-gray-50 dark:hover:bg-gray-800/40"
-                      }`}
-                    >
-                      <td className={`px-3 py-2.5 text-gray-400 ${isHighlighted && !isDone ? "border-l-4 border-accent-500 dark:border-accent-400" : ""}`}>{pos}</td>
-                      {columns.map((col) => {
-                        const raw = r.values[col] ?? "";
-                        if (col === DONE_COLUMN) {
-                          return (
-                            <td key={col} className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
-                              <input
-                                type="checkbox"
-                                checked={isDone}
-                                onChange={(e) => handleToggleDone(r.id, e.target.checked)}
-                                title={isDone ? `Marked done for ${thisQuarter}` : "Mark as done for this quarter"}
-                                className="w-4 h-4 accent-accent-600 cursor-pointer"
-                              />
-                            </td>
-                          );
-                        }
-                        if (isSensitiveColumn(col)) {
-                          const isCvv = col.trim().toLowerCase() === "cvv";
-                          const masked = raw
-                            ? (isRevealed
-                                ? raw
-                                : col.toLowerCase().includes("card") ? "•••• •••• •••• " + raw.slice(-4) : "•".repeat(raw.length))
-                            : "";
-                          return (
-                            <td key={col} className="px-3 py-2.5">
-                              <div className="flex items-center gap-1.5">
-                                <CopyCell
-                                  value={masked}
-                                  mono
-                                  onCopy={(e) => isCvv ? handleCvvCopy(raw, r.values, e) : handleCopy(col, raw)}
-                                />
-                                {raw && (
-                                  <button
-                                    className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 flex-shrink-0"
-                                    onClick={() => toggleReveal(r.id)}
-                                    title={isRevealed ? "Hide" : "Reveal"}
-                                  >
-                                    {isRevealed ? "🙈" : "👁"}
-                                  </button>
+                ) : displayGroups.map(({ email, items }) => (
+                  <Fragment key={email ?? "_all"}>
+                    {emailCol && (
+                      <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-800/70">
+                        <td colSpan={columns.length + 1} className="px-3 py-1.5 text-xs text-gray-500 dark:text-gray-400">
+                          <span className="font-medium">📧 {email}</span>
+                          <span className="ml-1.5 text-gray-400 dark:text-gray-600">({items.length})</span>
+                        </td>
+                      </tr>
+                    )}
+                    {items.map(({ row: r, pos }) => {
+                      const isRevealed = revealed.has(r.id);
+                      const isHighlighted = r.id === highlightedId;
+                      const isDone = (r.values[DONE_COLUMN] ?? "") === thisQuarter;
+                      return (
+                        <tr
+                          key={r.id}
+                          onClick={() => setHighlightedId(r.id)}
+                          className={`border-b border-gray-50 dark:border-gray-800/60 last:border-0 cursor-pointer transition-colors ${
+                            isDone
+                              ? "bg-gray-100 dark:bg-gray-800/60 text-gray-400 dark:text-gray-500"
+                              : isHighlighted ? "bg-accent-100 dark:bg-accent-500/30" : "hover:bg-gray-50 dark:hover:bg-gray-800/40"
+                          }`}
+                        >
+                          <td className={`px-3 py-2.5 text-gray-400 ${isHighlighted && !isDone ? "border-l-4 border-accent-500 dark:border-accent-400" : ""}`}>{pos}</td>
+                          {columns.map((col) => {
+                            const raw = r.values[col] ?? "";
+                            if (col === DONE_COLUMN) {
+                              return (
+                                <td key={col} className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+                                  <input
+                                    type="checkbox"
+                                    checked={isDone}
+                                    onChange={(e) => handleToggleDone(r.id, e.target.checked)}
+                                    title={isDone ? `Marked done for ${thisQuarter}` : "Mark as done for this quarter"}
+                                    className="w-4 h-4 accent-accent-600 cursor-pointer"
+                                  />
+                                </td>
+                              );
+                            }
+                            if (isSensitiveColumn(col)) {
+                              const isCvv = col.trim().toLowerCase() === "cvv";
+                              const masked = raw
+                                ? (isRevealed
+                                    ? raw
+                                    : col.toLowerCase().includes("card") ? "•••• •••• •••• " + raw.slice(-4) : "•".repeat(raw.length))
+                                : "";
+                              return (
+                                <td key={col} className="px-3 py-2.5">
+                                  <div className="flex items-center gap-1.5">
+                                    <CopyCell
+                                      value={masked}
+                                      mono
+                                      onCopy={(e) => isCvv ? handleCvvCopy(raw, r.values, e) : handleCopy(col, raw)}
+                                    />
+                                    {raw && (
+                                      <button
+                                        className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 flex-shrink-0"
+                                        onClick={() => toggleReveal(r.id)}
+                                        title={isRevealed ? "Hide" : "Reveal"}
+                                      >
+                                        {isRevealed ? "🙈" : "👁"}
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
+                              );
+                            }
+                            return (
+                              <td key={col} className="px-3 py-2.5 whitespace-nowrap">
+                                {isCopyableColumn(col) ? (
+                                  <CopyCell value={raw} onCopy={() => handleCopy(col, raw)} />
+                                ) : (
+                                  raw || <span className="text-gray-300 dark:text-gray-600">—</span>
                                 )}
-                              </div>
-                            </td>
-                          );
-                        }
-                        return (
-                          <td key={col} className="px-3 py-2.5 whitespace-nowrap">
-                            {isCopyableColumn(col) ? (
-                              <CopyCell value={raw} onCopy={() => handleCopy(col, raw)} />
-                            ) : (
-                              raw || <span className="text-gray-300 dark:text-gray-600">—</span>
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                })}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                  </Fragment>
+                ))}
               </tbody>
             </table>
           </div>

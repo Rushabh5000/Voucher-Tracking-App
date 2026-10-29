@@ -64,6 +64,29 @@ export function CardStatsPage() {
   const [year, setYear] = useState(() => new Date().getFullYear());
   // null = show all quarters; number = filter to that quarter
   const [quarter, setQuarter] = useState<number | null>(() => currentQuarter());
+  // Tracks manually-set collapse overrides; absent = use default (pending===0 → collapsed)
+  const [collapseOverrides, setCollapseOverrides] = useState<Record<string, boolean>>({});
+
+  function getCollapsed(groupKey: string, pendingCount: number): boolean {
+    return groupKey in collapseOverrides ? collapseOverrides[groupKey] : pendingCount === 0;
+  }
+  function toggleGroup(groupKey: string, pendingCount: number) {
+    setCollapseOverrides((prev) => {
+      const current = groupKey in prev ? prev[groupKey] : pendingCount === 0;
+      return { ...prev, [groupKey]: !current };
+    });
+  }
+  function expandAll() {
+    const next: Record<string, boolean> = {};
+    for (const g of groups) next[g.groupKey] = false;
+    setCollapseOverrides(next);
+  }
+  function collapseAll() {
+    const next: Record<string, boolean> = {};
+    for (const g of groups) next[g.groupKey] = true;
+    setCollapseOverrides(next);
+  }
+  function resetCollapse() { setCollapseOverrides({}); }
 
   // Map "Bank | last4" → { bank, cardType } so each voucher can find its card program
   const cardMeta = useMemo(() => {
@@ -236,6 +259,12 @@ export function CardStatsPage() {
           doesn't change its status here.
         </p>
         {selectors}
+        <div className="flex items-center gap-1.5 text-xs">
+          <span className="text-gray-400 dark:text-gray-500 mr-0.5">Groups:</span>
+          <button onClick={expandAll} className="btn-secondary text-xs py-1 px-2.5">Expand all</button>
+          <button onClick={collapseAll} className="btn-secondary text-xs py-1 px-2.5">Collapse all</button>
+          <button onClick={resetCollapse} className="btn-secondary text-xs py-1 px-2.5">Reset</button>
+        </div>
       </div>
 
       {groups.length === 0 && (
@@ -248,17 +277,20 @@ export function CardStatsPage() {
         </div>
       )}
 
-      {groups.map((g) => <GroupTable key={g.groupKey} group={g} />)}
+      {groups.map((g) => (
+        <GroupTable
+          key={g.groupKey}
+          group={g}
+          collapsed={getCollapsed(g.groupKey, g.pendingCount)}
+          onToggle={() => toggleGroup(g.groupKey, g.pendingCount)}
+        />
+      ))}
     </div>
   );
 }
 
-function GroupTable({ group }: { group: Group }) {
+function GroupTable({ group, collapsed, onToggle }: { group: Group; collapsed: boolean; onToggle: () => void }) {
   const { bank, cardType, cards, columns, cells, pendingCount } = group;
-
-  // A fully-claimed group has nothing left to act on, so collapse it by
-  // default — still one click away to double-check.
-  const [collapsed, setCollapsed] = useState(pendingCount === 0);
 
   // A column where every card in the group has claimed it adds nothing but
   // clutter as more brands/periods pile up — pull those out of the matrix
@@ -272,7 +304,7 @@ function GroupTable({ group }: { group: Group }) {
       {/* Group header: bank + card type — click to expand/collapse */}
       <button
         type="button"
-        onClick={() => setCollapsed((c) => !c)}
+        onClick={onToggle}
         className="w-full flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-gray-100 dark:border-gray-800 text-left hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors"
       >
         <div className="flex items-center gap-2">
