@@ -4,6 +4,8 @@ import { Toaster } from "react-hot-toast";
 import { useAuthStore }   from "@/store/authStore";
 import { useVoucherStore } from "@/store/voucherStore";
 import { useCardStore }   from "@/store/cardStore";
+import { useCvvLogStore } from "@/store/cvvLogStore";
+import { useCardBenefitsStore } from "@/store/cardBenefitsStore";
 import { Layout }         from "@/components/layout/Layout";
 import { ConnectionGate } from "@/components/layout/ConnectionGate";
 import { AddVoucherModal }  from "@/components/vouchers/AddVoucherModal";
@@ -49,7 +51,9 @@ export default function App() {
   const { pathname } = useLocation();
   const activePage = pageForPath(pathname);
   const { load: loadVouchers, loaded, loading, error } = useVoucherStore();
-  const { load: loadCards }    = useCardStore();
+  const { load: loadCards }        = useCardStore();
+  const { load: loadCvvLogs }      = useCvvLogStore();
+  const { load: loadCardBenefits } = useCardBenefitsStore();
 
   const [authView, setAuthView] = useState<"login" | "register">("login");
   const [addOpen, setAddOpen] = useState(false);
@@ -78,6 +82,8 @@ export default function App() {
     if (!token) return;
     loadVouchers();
     loadCards();
+    loadCvvLogs();
+    loadCardBenefits();
   }, [token]);
 
   // Auto-logout when guest session expires

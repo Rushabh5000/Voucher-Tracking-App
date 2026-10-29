@@ -40,6 +40,7 @@ model User {
   cards                Card[]
   autocompleteEntries  AutocompleteEntry[]
   cvvUsageLogs         CvvUsageLog[]
+  cardBenefits         CardBenefit[]
 
   @@index([role])
   @@index([expiresAt])
@@ -133,6 +134,24 @@ model AppSetting {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+// Defines the recurring benefits offered by a card type (bank + card type).
+// Used by Card Stats to show pending slots even before any voucher is claimed,
+// and by the Add Voucher form to auto-hint period/brand for a selected card.
+model CardBenefit {
+  id         String   @id @default(uuid())
+  bank       String
+  cardType   String
+  brand      String
+  periodType String   // QUARTERLY | HALF_YEARLY | YEARLY
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([bank, cardType, brand, userId])
+  @@index([userId])
+  @@index([bank, cardType])
 }
 
 // Records every mutating DB operation for auditing

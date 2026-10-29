@@ -253,7 +253,8 @@ export function CardVaultPage() {
   // bridge (see vite.config.ts). No-ops instantly if unset or not running the
   // dev/preview server — the manual screen below is what shows in that case.
   useEffect(() => {
-    if (autoLoadStarted.current || fileName) return;
+    if (fileName) { setAutoLoadChecked(true); return; }
+    if (autoLoadStarted.current) return;
     autoLoadStarted.current = true;
     tryLoadDevVaultFile().then((result) => {
       if (result) {

@@ -10,6 +10,7 @@ import reportsRouter      from "./routes/reports";
 import auditRouter        from "./routes/audit";
 import authRouter         from "./routes/auth";
 import cvvUsageRouter     from "./routes/cvvUsage";
+import cardBenefitsRouter from "./routes/cardBenefits";
 import { requireAuth }    from "./middleware/authMiddleware";
 import { errorHandler }   from "./middleware/errorHandler";
 import { startMonthlyReportJob } from "./jobs/monthlyReport";
@@ -48,6 +49,7 @@ app.use("/api/cards",        cardsRouter);
 app.use("/api/autocomplete", autocompleteRouter);
 app.use("/api/audit",        auditRouter);
 app.use("/api/cvv-usage",    cvvUsageRouter);
+app.use("/api/card-benefits", cardBenefitsRouter);
 app.use("/api",              reportsRouter);   // /api/analytics, /api/export/*
 
 // Serve React build in production (only when co-located — not when using Vercel)

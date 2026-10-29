@@ -3,6 +3,7 @@ import toast from "react-hot-toast";
 import { useVoucherStore } from "@/store/voucherStore";
 import { useCardStore } from "@/store/cardStore";
 import { cvvUsageApi, type CvvUsageLog } from "@/api/client";
+import { useCvvLogStore } from "@/store/cvvLogStore";
 import { fmtDateTime, copyToClipboard } from "@/utils/formatters";
 
 function emailForLabel(cardLabel: string, cards: ReturnType<typeof useCardStore.getState>["cards"]): string {
@@ -29,7 +30,10 @@ export function PendingCouponsPage({ onAddVoucher }: PendingCouponsPageProps) {
 
   useEffect(() => {
     cvvUsageApi.list()
-      .then(setLogs)
+      .then((data) => {
+        setLogs(data);
+        useCvvLogStore.getState().setLogs(data);
+      })
       .catch(() => toast.error("Couldn't load the CVV usage log"))
       .finally(() => setLoading(false));
   }, []);

@@ -3,12 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { useVoucherStore } from "@/store/voucherStore";
 import { useCardStore } from "@/store/cardStore";
 import { useCardVaultStore } from "@/store/cardVaultStore";
+import { useCvvLogStore } from "@/store/cvvLogStore";
 import { isSensitiveColumn } from "@/utils/cardVaultExcel";
 import { PAGE_PATHS } from "@/utils/routes";
 
 interface Result {
   id: string;
-  type: "voucher" | "card" | "vault";
+  type: "voucher" | "card" | "vault" | "pending";
   icon: string;
   primary: string;
   secondary: string;
@@ -37,6 +38,7 @@ export function GlobalSearch() {
   const { vouchers } = useVoucherStore();
   const { cards } = useCardStore();
   const { rows: vaultRows, columns: vaultCols } = useCardVaultStore();
+  const { logs: cvvLogs } = useCvvLogStore();
 
   const results = useMemo<Result[]>(() => {
     const q = query.trim();
@@ -127,8 +129,31 @@ export function GlobalSearch() {
       vaultCount++;
     }
 
+    // ── Pending coupons (CVV log entries without a matching voucher) ──────
+    const voucherBookingIds = new Set(
+      vouchers.map((v) => v.bookingId.trim().toLowerCase()).filter(Boolean)
+    );
+    let pendingCount = 0;
+    for (const log of cvvLogs) {
+      if (pendingCount >= MAX_PER_TYPE) break;
+      if (!log.bookingId.trim()) continue;
+      if (voucherBookingIds.has(log.bookingId.trim().toLowerCase())) continue;
+      if (!hits(q, log.brand, log.bookingId, log.cardLabel)) continue;
+      out.push({
+        id: `pend-${log.id}`,
+        type: "pending",
+        icon: "⏳",
+        primary: log.brand ? `${log.brand} · Booking ${log.bookingId}` : `Booking ${log.bookingId}`,
+        secondary: log.cardLabel,
+        badge: "Pending",
+        badgeCls: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300",
+        path: PAGE_PATHS.pendingCoupons,
+      });
+      pendingCount++;
+    }
+
     return out;
-  }, [query, vouchers, cards, vaultRows, vaultCols]);
+  }, [query, vouchers, cards, vaultRows, vaultCols, cvvLogs]);
 
   // Reset cursor when results change
   useEffect(() => { setCursor(-1); }, [results]);
@@ -177,12 +202,13 @@ export function GlobalSearch() {
     voucher: "Vouchers",
     card: "Cards",
     vault: "Card Vault",
+    pending: "Pending Coupons",
   };
 
   // Group results by type for section headers; flatIdx is position in the flat results array for keyboard nav
   const resultIndex = new Map(results.map((r, i) => [r.id, i]));
   const sections: { type: Result["type"]; items: (Result & { flatIdx: number })[] }[] = [];
-  for (const type of ["voucher", "card", "vault"] as Result["type"][]) {
+  for (const type of ["voucher", "card", "vault", "pending"] as Result["type"][]) {
     const items = results
       .filter((r) => r.type === type)
       .map((r) => ({ ...r, flatIdx: resultIndex.get(r.id) ?? 0 }));

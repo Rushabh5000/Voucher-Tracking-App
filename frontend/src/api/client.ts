@@ -118,6 +118,26 @@ export const cvvUsageApi = {
     http.delete(`/cvv-usage/${id}`),
 };
 
+// ─── Card Benefits ────────────────────────────────────────────
+// Per-card-type benefit definitions (bank + cardType → brand + periodType).
+// Drives Card Stats "pending" columns even before any voucher is claimed.
+export interface CardBenefit {
+  id: string;
+  bank: string;
+  cardType: string;
+  brand: string;
+  periodType: string;
+  createdAt: string;
+}
+
+export const cardBenefitsApi = {
+  list:   () =>
+    http.get<{ data: CardBenefit[] }>("/card-benefits").then(r => r.data.data),
+  create: (data: { bank: string; cardType: string; brand: string; periodType: string }) =>
+    http.post<{ data: CardBenefit }>("/card-benefits", data).then(r => r.data.data),
+  remove: (id: string) => http.delete(`/card-benefits/${id}`),
+};
+
 // ─── Analytics ────────────────────────────────────────────────
 export const analyticsApi = {
   get: () => http.get<{ data: AnalyticsData }>("/analytics").then(r => r.data.data),

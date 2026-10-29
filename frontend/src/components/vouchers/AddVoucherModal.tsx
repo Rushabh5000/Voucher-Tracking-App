@@ -8,7 +8,9 @@ import { BookingIdSelect } from "./BookingIdSelect";
 import { PeriodSelector } from "./PeriodSelector";
 import { currentPeriodKey } from "@/utils/periods";
 import { useCardStore } from "@/store/cardStore";
+import { useCardBenefitsStore } from "@/store/cardBenefitsStore";
 import { cvvUsageApi, type CvvUsageLog } from "@/api/client";
+import { PERIOD_TYPE_LABEL } from "@/utils/periods";
 import type { Card } from "@/types";
 
 // Pulls "bank" and "last 4 digits" back out of a Card Vault row label like
@@ -83,6 +85,7 @@ function cardLabel(card: Card): string {
 export function AddVoucherModal({ open, onClose, prefillBookingId }: AddVoucherModalProps) {
   const { addVoucher, vouchers } = useVoucherStore();
   const { cards } = useCardStore();
+  const { benefits } = useCardBenefitsStore();
 
   const [form,   setForm]   = useState<FormState>(blankForm);
   const [saving, setSaving] = useState(false);
@@ -310,24 +313,50 @@ export function AddVoucherModal({ open, onClose, prefillBookingId }: AddVoucherM
         </div>
 
         {/* ── Row 3: Auto-filled card fields (disabled) ── */}
-        {form.sourceCardId && (
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="label">Card owner <span className="text-xs text-gray-400 font-normal">(from card)</span></label>
-                <input className={disabledCls} value={form.cardOwner} readOnly tabIndex={-1} />
+        {form.sourceCardId && (() => {
+          const card = cards.find((c) => c.id === form.sourceCardId);
+          const cardBenefits = card
+            ? benefits.filter((b) => b.bank === card.bank && b.cardType === card.cardType)
+            : [];
+          return (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Card owner <span className="text-xs text-gray-400 font-normal">(from card)</span></label>
+                  <input className={disabledCls} value={form.cardOwner} readOnly tabIndex={-1} />
+                </div>
+                <div>
+                  <label className="label">Card name <span className="text-xs text-gray-400 font-normal">(from card)</span></label>
+                  <input className={disabledCls} value={form.cardName} readOnly tabIndex={-1} />
+                </div>
               </div>
               <div>
-                <label className="label">Card name <span className="text-xs text-gray-400 font-normal">(from card)</span></label>
-                <input className={disabledCls} value={form.cardName} readOnly tabIndex={-1} />
+                <label className="label">Email ID <span className="text-xs text-gray-400 font-normal">(from card)</span></label>
+                <input className={disabledCls} value={form.emailId} readOnly tabIndex={-1} />
               </div>
+              {cardBenefits.length > 0 && (
+                <div>
+                  <label className="label text-xs text-indigo-600 dark:text-indigo-400">
+                    💡 Defined benefits — click to auto-fill Brand &amp; Period
+                  </label>
+                  <div className="flex flex-wrap gap-1.5 mt-1">
+                    {cardBenefits.map((b) => (
+                      <button
+                        key={b.id}
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, brand: b.brand, periodType: b.periodType }))}
+                        className="text-xs px-2.5 py-1 rounded-full border border-indigo-200 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors"
+                        title={`Fill: ${b.brand} · ${PERIOD_TYPE_LABEL[b.periodType] ?? b.periodType}`}
+                      >
+                        {b.brand} · {PERIOD_TYPE_LABEL[b.periodType] ?? b.periodType}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-            <div>
-              <label className="label">Email ID <span className="text-xs text-gray-400 font-normal">(from card)</span></label>
-              <input className={disabledCls} value={form.emailId} readOnly tabIndex={-1} />
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* ── Row 4: Issue date + Expiry date ── */}
         <div>
