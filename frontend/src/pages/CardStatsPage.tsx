@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import toast from "react-hot-toast";
 import { useVoucherStore } from "@/store/voucherStore";
 import { useCardStore } from "@/store/cardStore";
 import { useCardBenefitsStore } from "@/store/cardBenefitsStore";
@@ -370,7 +371,10 @@ function GroupTable({
     try {
       await onAddBenefit(newBrand.trim(), newPeriodType);
       setNewBrand("");
-    } catch {}
+      toast.success("Benefit added");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error ?? err?.message ?? "Failed to add benefit");
+    }
     setSaving(false);
   }
 
@@ -434,7 +438,7 @@ function GroupTable({
               <span className="text-gray-500 dark:text-gray-400">{PERIOD_TYPE_LABEL[b.periodType] ?? b.periodType}</span>
               <button
                 type="button"
-                onClick={() => onRemoveBenefit(b.id)}
+                onClick={() => onRemoveBenefit(b.id).then(() => toast.success("Benefit removed")).catch((err: any) => toast.error(err?.response?.data?.error ?? "Failed to remove"))}
                 className="ml-auto text-red-400 hover:text-red-600 dark:hover:text-red-300"
                 title="Remove benefit"
               >✕</button>
