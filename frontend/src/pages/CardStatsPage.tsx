@@ -285,29 +285,33 @@ export function CardStatsPage() {
   return (
     <div className="space-y-4">
       {/* Summary banner */}
-      <div className="card p-4 flex flex-wrap items-center gap-x-8 gap-y-2">
-        <div>
-          <div className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{groups.length}</div>
-          <div className="text-xs text-gray-500 dark:text-gray-400">Card programs tracked</div>
-        </div>
-        <div>
-          <div className={`text-2xl font-semibold ${totalPending > 0 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>
-            {totalPending}
+      <div className="card p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Stats */}
+          <div className="flex items-center gap-4 shrink-0">
+            <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-800/60">
+              <span className="text-lg font-bold text-gray-900 dark:text-gray-100">{groups.length}</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400 leading-tight">Card<br/>programs</span>
+            </div>
+            <div className={`flex items-center gap-2.5 px-3 py-2 rounded-lg ${totalPending > 0 ? "bg-amber-50 dark:bg-amber-900/20" : "bg-emerald-50 dark:bg-emerald-900/20"}`}>
+              <span className={`text-lg font-bold ${totalPending > 0 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>{totalPending}</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400 leading-tight">Pending<br/>benefits</span>
+            </div>
           </div>
-          <div className="text-xs text-gray-500 dark:text-gray-400">Pending across all cards</div>
-        </div>
-        <p className="text-xs text-gray-400 dark:text-gray-500 max-w-md flex-1">
-          Cards are compared only within the same <strong>bank &amp; card type</strong>. Each column is
-          one brand within one period (quarterly/half-yearly/yearly benefits are independent, so
-          claiming one never counts toward another). Tracks claims only — redeeming a voucher
-          doesn't change its status here.
-        </p>
-        {selectors}
-        <div className="flex items-center gap-1.5 text-xs">
-          <span className="text-gray-400 dark:text-gray-500 mr-0.5">Groups:</span>
-          <button onClick={expandAll} className="btn-secondary text-xs py-1 px-2.5">Expand all</button>
-          <button onClick={collapseAll} className="btn-secondary text-xs py-1 px-2.5">Collapse all</button>
-          <button onClick={resetCollapse} className="btn-secondary text-xs py-1 px-2.5">Reset</button>
+
+          <div className="w-px h-8 bg-gray-200 dark:bg-gray-700 shrink-0 hidden sm:block" />
+
+          {/* Selectors */}
+          {selectors}
+
+          <div className="w-px h-8 bg-gray-200 dark:bg-gray-700 shrink-0 hidden sm:block" />
+
+          {/* Group controls */}
+          <div className="flex items-center gap-1.5">
+            <button onClick={expandAll}    className="btn-secondary text-xs py-1 px-2.5">Expand all</button>
+            <button onClick={collapseAll}  className="btn-secondary text-xs py-1 px-2.5">Collapse all</button>
+            <button onClick={resetCollapse} className="btn-secondary text-xs py-1 px-2.5">Reset</button>
+          </div>
         </div>
       </div>
 
