@@ -81,29 +81,37 @@ export function CardStatsPage() {
   const [year, setYear] = useState(() => new Date().getFullYear());
   // null = show all quarters; number = filter to that quarter
   const [quarter, setQuarter] = useState<number | null>(() => currentQuarter());
-  // Tracks manually-set collapse overrides; absent = use default (pending===0 → collapsed)
-  const [collapseOverrides, setCollapseOverrides] = useState<Record<string, boolean>>({});
+  const LS_KEY = "vt-cardstats-collapse";
+
+  // Tracks manually-set collapse overrides; absent = use default (pending===0 → collapsed).
+  // Persisted to localStorage so the state survives page refresh.
+  const [collapseOverrides, setCollapseOverrides] = useState<Record<string, boolean>>(() => {
+    try { return JSON.parse(localStorage.getItem(LS_KEY) ?? "{}"); } catch { return {}; }
+  });
+
+  function saveOverrides(next: Record<string, boolean>) {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(next)); } catch {}
+    setCollapseOverrides(next);
+  }
 
   function getCollapsed(groupKey: string, pendingCount: number): boolean {
     return groupKey in collapseOverrides ? collapseOverrides[groupKey] : pendingCount === 0;
   }
   function toggleGroup(groupKey: string, pendingCount: number) {
-    setCollapseOverrides((prev) => {
-      const current = groupKey in prev ? prev[groupKey] : pendingCount === 0;
-      return { ...prev, [groupKey]: !current };
-    });
+    const current = groupKey in collapseOverrides ? collapseOverrides[groupKey] : pendingCount === 0;
+    saveOverrides({ ...collapseOverrides, [groupKey]: !current });
   }
   function expandAll() {
     const next: Record<string, boolean> = {};
     for (const g of groups) next[g.groupKey] = false;
-    setCollapseOverrides(next);
+    saveOverrides(next);
   }
   function collapseAll() {
     const next: Record<string, boolean> = {};
     for (const g of groups) next[g.groupKey] = true;
-    setCollapseOverrides(next);
+    saveOverrides(next);
   }
-  function resetCollapse() { setCollapseOverrides({}); }
+  function resetCollapse() { saveOverrides({}); }
 
   // Map "Bank | last4" → { bank, cardType } so each voucher can find its card program
   const cardMeta = useMemo(() => {
