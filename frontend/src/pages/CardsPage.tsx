@@ -85,24 +85,22 @@ export function CardsPage({ onEditVoucher }: { onEditVoucher: (id: string) => vo
   // Vouchers for whichever card is currently expanded
   const cardVouchers = useMemo(() => {
     if (!selectedCard) return [];
-    const matched = vouchers.filter(
-      v => v.cardName === selectedCard.cardName && v.cardOwner === selectedCard.accountOwner
-    );
-    return sortVouchers(matched);
+    const label = `${selectedCard.bank} | ${selectedCard.lastFourDigits}`;
+    return sortVouchers(vouchers.filter(v => v.sourceProgramOrCard === label));
   }, [vouchers, selectedCard]);
 
-  // Voucher count badge per card
+  // Voucher count badge per card — keyed by "Bank | last4" to match sourceProgramOrCard
   const voucherCounts = useMemo(() => {
     const map = new Map<string, number>();
     for (const v of vouchers) {
-      const key = `${v.cardName}|||${v.cardOwner}`;
-      map.set(key, (map.get(key) ?? 0) + 1);
+      if (!v.sourceProgramOrCard) continue;
+      map.set(v.sourceProgramOrCard, (map.get(v.sourceProgramOrCard) ?? 0) + 1);
     }
     return map;
   }, [vouchers]);
 
   const getCount = (card: Card) =>
-    voucherCounts.get(`${card.cardName}|||${card.accountOwner}`) ?? 0;
+    voucherCounts.get(`${card.bank} | ${card.lastFourDigits}`) ?? 0;
 
   // Search filter — matches name, bank, owner, last 4, card type
   const filteredCards = useMemo(() => {

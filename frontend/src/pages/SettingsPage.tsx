@@ -1,11 +1,12 @@
 import { useUIStore } from "@/store/uiStore";
 import { FieldValuesManager } from "@/components/settings/FieldValuesManager";
+import { AuditPage } from "./AuditPage";
 
 export function SettingsPage() {
   const { theme, setTheme } = useUIStore();
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="space-y-6">
       {/* Appearance */}
       <div className="card p-5">
         <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-4">Appearance</h3>
@@ -43,6 +44,12 @@ export function SettingsPage() {
           <div className="flex justify-between"><span>Backend</span><span className="font-medium text-gray-700 dark:text-gray-300">Node.js + Express + Prisma + PostgreSQL</span></div>
           <div className="flex justify-between"><span>Purpose</span><span className="font-medium text-gray-700 dark:text-gray-300">India card voucher tracker</span></div>
         </div>
+      </div>
+
+      {/* Audit Log */}
+      <div>
+        <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-3">Audit Log</h3>
+        <AuditPage />
       </div>
 
       {/* Email config reminder */}

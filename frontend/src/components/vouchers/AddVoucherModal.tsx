@@ -114,6 +114,23 @@ export function AddVoucherModal({ open, onClose, prefillBookingId }: AddVoucherM
     }
   }, [open, prefillBookingId]);
 
+  // Auto-apply period type from defined benefit when brand + card are both set
+  useEffect(() => {
+    if (!form.brand || !form.sourceCardId) return;
+    const card = cards.find((c) => c.id === form.sourceCardId);
+    if (!card) return;
+    const match = benefits.find(
+      (b) => b.bank === card.bank && b.cardType === card.cardType &&
+             b.brand.toLowerCase() === form.brand.trim().toLowerCase()
+    );
+    if (!match) return;
+    setForm((f) => ({
+      ...f,
+      periodType: match.periodType,
+      periodKey:  currentPeriodKey(match.periodType as any),
+    }));
+  }, [form.brand, form.sourceCardId]);
+
   // When sourceCardId changes, auto-fill disabled fields from the matching card
   const applyCardFields = useCallback((cardId: string) => {
     const card = cards.find((c) => c.id === cardId);
@@ -344,7 +361,7 @@ export function AddVoucherModal({ open, onClose, prefillBookingId }: AddVoucherM
                       <button
                         key={b.id}
                         type="button"
-                        onClick={() => setForm((f) => ({ ...f, brand: b.brand, periodType: b.periodType }))}
+                        onClick={() => setForm((f) => ({ ...f, brand: b.brand, periodType: b.periodType, periodKey: currentPeriodKey(b.periodType as any) }))}
                         className="text-xs px-2.5 py-1 rounded-full border border-indigo-200 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors"
                         title={`Fill: ${b.brand} · ${PERIOD_TYPE_LABEL[b.periodType] ?? b.periodType}`}
                       >

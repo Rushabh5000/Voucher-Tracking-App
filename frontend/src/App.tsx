@@ -26,7 +26,7 @@ const CardVaultPage = lazy(() =>
 );
 import { AnalyticsPage }  from "@/pages/AnalyticsPage";
 import { ExportPage }     from "@/pages/ExportPage";
-import { AuditPage }      from "@/pages/AuditPage";
+import { CardBenefitsPage } from "@/pages/CardBenefitsPage";
 import { SettingsPage }   from "@/pages/SettingsPage";
 import { LoginPage }      from "@/pages/LoginPage";
 import { RegisterPage }   from "@/pages/RegisterPage";
@@ -42,7 +42,7 @@ const PAGE_TITLES: Record<string, { title: string; subtitle?: string }> = {
   pendingCoupons: { title: "Pending Coupons", subtitle: "Booking IDs logged in Card Vault with no voucher added yet" },
   analytics: { title: "Analytics", subtitle: "Charts and trends" },
   export:    { title: "Export", subtitle: "Excel, PDF, and email reports" },
-  audit:     { title: "Audit Log", subtitle: "Every API call, recorded" },
+  benefits:  { title: "Card Benefits", subtitle: "Define recurring benefits per card program — shown in Card Stats" },
   settings:  { title: "Settings" },
 };
 
@@ -160,7 +160,7 @@ export default function App() {
           />
           <Route path={PAGE_PATHS.analytics} element={gated(<AnalyticsPage />)} />
           <Route path={PAGE_PATHS.export}    element={gated(<ExportPage />)} />
-          <Route path={PAGE_PATHS.audit}     element={gated(<AuditPage />)} />
+          <Route path={PAGE_PATHS.benefits}  element={gated(<CardBenefitsPage />)} />
           <Route path={PAGE_PATHS.settings}  element={gated(<SettingsPage />)} />
           <Route path="*" element={<Navigate to={PAGE_PATHS.dashboard} replace />} />
         </Routes>

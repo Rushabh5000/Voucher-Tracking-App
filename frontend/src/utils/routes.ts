@@ -13,7 +13,7 @@ export const PAGE_PATHS: Record<Page, string> = {
   pendingCoupons: "/pending-coupons",
   analytics: "/analytics",
   export:    "/export",
-  audit:     "/audit",
+  benefits:  "/benefits",
   settings:  "/settings",
 };
 

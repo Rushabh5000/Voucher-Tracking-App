@@ -84,6 +84,7 @@ export function VoucherCard({ voucher, onView, onEdit }: VoucherCardProps) {
               </span>
               {sourceLabel && <span>Source: {sourceLabel}</span>}
               {voucher.cardOwner && <span>Owner: {voucher.cardOwner}</span>}
+              {voucher.emailId && <span>{voucher.emailId}</span>}
               <span className={expired ? "text-red-500" : soon ? "text-amber-500" : ""}>
                 Expiry:{" "}
                 {voucher.expiryDate ? fmtDate(voucher.expiryDate) : <span className="text-gray-300 dark:text-gray-600">None</span>}

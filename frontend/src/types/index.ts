@@ -118,5 +118,5 @@ export type Page =
   | "pendingCoupons"
   | "analytics"
   | "export"
-  | "audit"
+  | "benefits"
   | "settings";

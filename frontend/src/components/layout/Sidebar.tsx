@@ -16,7 +16,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "pendingCoupons", label: "Pending Coupons", icon: "⏳" },
   { id: "analytics", label: "Analytics",  icon: "📊" },
   { id: "export",    label: "Export",     icon: "⬇" },
-  { id: "audit",     label: "Audit Log",  icon: "📋" },
+  { id: "benefits",  label: "Card Benefits", icon: "💡" },
   { id: "settings",  label: "Settings",   icon: "⚙" },
 ];
 
