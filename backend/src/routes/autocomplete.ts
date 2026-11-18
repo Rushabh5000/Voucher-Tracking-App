@@ -34,32 +34,17 @@ router.get("/", async (req: Request, res: Response, next: NextFunction) => {
       return;
     }
 
-    let contextFilter: Record<string, any> | undefined;
-    if (contextField && contextValue && field === "title" && contextField === "brand") {
-      contextFilter = { brand: contextValue, userId };
-    }
 
-    let entries = await prisma.autocompleteEntry.findMany({
+    const entries = await prisma.autocompleteEntry.findMany({
       where: {
         field,
         userId,
         value: q ? { contains: q, mode: "insensitive" } : undefined,
       },
       orderBy: [{ count: "desc" }, { value: "asc" }],
-      take: 100,
+      take: 20,
     });
 
-    if (contextFilter) {
-      const vouchersWithContext = await prisma.voucher.findMany({
-        where: contextFilter,
-        select: { title: true },
-        distinct: ["title"],
-      });
-      const validTitles = new Set(vouchersWithContext.map(v => v.title).filter(t => t));
-      entries = entries.filter(e => validTitles.has(e.value));
-    }
-
-    entries = entries.slice(0, 20);
     res.json({ data: entries.map((e: { value: string }) => e.value) });
   } catch (err) { next(err); }
 });
