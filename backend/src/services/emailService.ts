@@ -75,7 +75,7 @@ export async function checkAndSendIfOverdue(): Promise<void> {
 
 async function buildPdfBuffer(): Promise<Buffer> {
   return new Promise(async (resolve, reject) => {
-    const analytics = await buildAnalytics();
+    const analytics = await buildAnalytics(null);
     const { summary, brandBreakdown, monthlyTrend } = analytics;
 
     const doc = new PDFDocument({ size: "A4", margin: 40, bufferPages: true });
@@ -349,7 +349,7 @@ export async function sendMonthlyReport(): Promise<void> {
     return;
   }
 
-  const analytics  = await buildAnalytics();
+  const analytics  = await buildAnalytics(null);
   const { summary } = analytics;
   const pdfBuffer  = await buildPdfBuffer();
   const transport  = createTransport();
