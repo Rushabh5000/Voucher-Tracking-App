@@ -158,8 +158,8 @@ export default function App() {
             path={PAGE_PATHS.pendingCoupons}
             element={gated(<PendingCouponsPage onAddVoucher={(bookingId) => { setPrefillBookingId(bookingId); setAddOpen(true); }} />)}
           />
-          <Route path={PAGE_PATHS.analytics} element={gated(<AnalyticsPage />)} />
-          <Route path={PAGE_PATHS.export}    element={gated(<ExportPage />)} />
+          <Route path={PAGE_PATHS.analytics} element={role === "guest" ? <Navigate to={PAGE_PATHS.dashboard} replace /> : gated(<AnalyticsPage />)} />
+          <Route path={PAGE_PATHS.export}    element={role === "guest" ? <Navigate to={PAGE_PATHS.dashboard} replace /> : gated(<ExportPage />)} />
           <Route path={PAGE_PATHS.benefits}  element={gated(<CardBenefitsPage />)} />
           <Route path={PAGE_PATHS.settings}  element={gated(<SettingsPage />)} />
           <Route path="*" element={<Navigate to={PAGE_PATHS.dashboard} replace />} />

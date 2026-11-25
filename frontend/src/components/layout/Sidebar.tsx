@@ -4,7 +4,7 @@ import { useAuthStore }  from "@/store/authStore";
 import { PAGE_PATHS } from "@/utils/routes";
 import type { Page }     from "@/types";
 
-interface NavItem { id: Page; label: string; icon: string; }
+interface NavItem { id: Page; label: string; icon: string; guestHidden?: boolean; }
 
 const NAV_ITEMS: NavItem[] = [
   { id: "dashboard", label: "Dashboard",  icon: "⊞" },
@@ -14,8 +14,8 @@ const NAV_ITEMS: NavItem[] = [
   { id: "cardvault", label: "Card Vault",    icon: "🔐" },
   { id: "cardstats", label: "Card Stats",    icon: "🔁" },
   { id: "pendingCoupons", label: "Pending Coupons", icon: "⏳" },
-  { id: "analytics", label: "Analytics",  icon: "📊" },
-  { id: "export",    label: "Export",     icon: "⬇" },
+  { id: "analytics", label: "Analytics",  icon: "📊", guestHidden: true },
+  { id: "export",    label: "Export",     icon: "⬇", guestHidden: true },
   { id: "benefits",  label: "Card Benefits", icon: "💡" },
   { id: "settings",  label: "Settings",   icon: "⚙" },
 ];
@@ -58,7 +58,7 @@ export function Sidebar() {
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto p-2 space-y-0.5">
-          {NAV_ITEMS.map((item) => (
+          {NAV_ITEMS.filter((item) => !(role === "guest" && item.guestHidden)).map((item) => (
             <NavLink
               key={item.id}
               to={PAGE_PATHS[item.id]}
