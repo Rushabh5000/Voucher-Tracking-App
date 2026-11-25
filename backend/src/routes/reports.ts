@@ -20,6 +20,7 @@ function blockGuest(req: Request, res: Response): boolean {
 
 // GET /api/analytics — structured analytics data for charts
 router.get("/analytics", async (req: Request, res: Response, next: NextFunction) => {
+  if (blockGuest(req, res)) return;
   try {
     const data = await buildAnalytics(userId(req));
     res.json({ data });
