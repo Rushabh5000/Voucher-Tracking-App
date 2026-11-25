@@ -12,6 +12,7 @@ interface AuditEntry {
   durationMs: number;
   ipAddress?: string | null;
   userAgent?: string | null;
+  userId?:    string | null;
 }
 
 function write(entry: AuditEntry): void {
@@ -37,6 +38,7 @@ export function auditWriter(req: Request, startAt: number) {
       durationMs: Date.now() - startAt,
       ipAddress:  req.ip ?? null,
       userAgent:  req.get("user-agent") ?? null,
+      userId:     req.user?.userId ?? null,
     });
   };
 }

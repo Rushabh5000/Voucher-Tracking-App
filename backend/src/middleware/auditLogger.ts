@@ -42,6 +42,7 @@ export function auditLogger(req: Request, res: Response, next: NextFunction): vo
         durationMs,
         ipAddress:  req.ip ?? null,
         userAgent:  req.get("user-agent") ?? null,
+        userId:     req.user?.userId ?? null,
       },
     }).catch(err => console.error("[Audit] Write failed:", err));
   });

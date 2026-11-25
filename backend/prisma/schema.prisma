@@ -41,6 +41,7 @@ model User {
   autocompleteEntries  AutocompleteEntry[]
   cvvUsageLogs         CvvUsageLog[]
   cardBenefits         CardBenefit[]
+  auditLogs            AuditLog[]
 
   @@index([role])
   @@index([expiresAt])
@@ -167,8 +168,11 @@ model AuditLog {
   durationMs Int
   ipAddress  String?
   userAgent  String?
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   createdAt  DateTime @default(now())
 
   @@index([createdAt])
   @@index([entity])
+  @@index([userId])
 }
