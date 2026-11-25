@@ -34,10 +34,10 @@ function effStatus(v: { status: string; expiryDate: Date | null }): string {
 
 // ─── Excel Export ─────────────────────────────────────────────────────────────
 
-export async function generateExcel(res: Response): Promise<void> {
+export async function generateExcel(res: Response, userId: string | null): Promise<void> {
   const [rawVouchers, analytics] = await Promise.all([
-    prisma.voucher.findMany({ orderBy: { dateAdded: "asc" } }),
-    buildAnalytics(),
+    prisma.voucher.findMany({ where: { userId }, orderBy: { dateAdded: "asc" } }),
+    buildAnalytics(userId),
   ]);
   const vouchers = rawVouchers.map(decryptVoucher);
 
@@ -142,10 +142,10 @@ export async function generateExcel(res: Response): Promise<void> {
 
 // ─── PDF Export ───────────────────────────────────────────────────────────────
 
-export async function generatePDF(res: Response): Promise<void> {
+export async function generatePDF(res: Response, userId: string | null): Promise<void> {
   const [rawVouchers, analytics] = await Promise.all([
-    prisma.voucher.findMany({ orderBy: { dateAdded: "asc" } }),
-    buildAnalytics(),
+    prisma.voucher.findMany({ where: { userId }, orderBy: { dateAdded: "asc" } }),
+    buildAnalytics(userId),
   ]);
   const vouchers = rawVouchers.map(decryptVoucher);
 
@@ -346,16 +346,17 @@ export async function generatePDF(res: Response): Promise<void> {
 
 // ─── Master Excel Export — full DB dump ───────────────────────────────────────
 
-export async function generateMasterExcel(res: Response): Promise<void> {
+export async function generateMasterExcel(res: Response, userId: string | null): Promise<void> {
   const [rawVouchers, rawCards, analytics] = await Promise.all([
-    prisma.voucher.findMany({ orderBy: { dateAdded: "asc" } }),
-    prisma.card.findMany({ orderBy: { bank: "asc" } }),
-    buildAnalytics(),
+    prisma.voucher.findMany({ where: { userId }, orderBy: { dateAdded: "asc" } }),
+    prisma.card.findMany({ where: { userId }, orderBy: { bank: "asc" } }),
+    buildAnalytics(userId),
   ]);
   const vouchers = rawVouchers.map(decryptVoucher);
   const cards    = rawCards.map(decryptCard);
 
   const autocompleteEntries = await prisma.autocompleteEntry.findMany({
+    where: { userId },
     orderBy: [{ field: "asc" }, { count: "desc" }],
   });
 

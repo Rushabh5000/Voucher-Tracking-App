@@ -35,8 +35,8 @@ function effStatus(v: { status: string; expiryDate: Date | null }): string {
   return "UNREDEEMED";
 }
 
-export async function buildAnalytics(): Promise<AnalyticsData> {
-  const vouchers = await prisma.voucher.findMany({ orderBy: { dateAdded: "asc" } });
+export async function buildAnalytics(userId: string | null): Promise<AnalyticsData> {
+  const vouchers = await prisma.voucher.findMany({ where: { userId }, orderBy: { dateAdded: "asc" } });
   const now = new Date();
 
   const withStatus: Array<VRow & { effStatus: string }> = (vouchers as VRow[]).map((v: VRow) => ({
