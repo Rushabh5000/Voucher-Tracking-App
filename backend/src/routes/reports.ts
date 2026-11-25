@@ -10,17 +10,8 @@ function userId(req: Request): string | null {
   return u.role === "admin" ? null : u.userId;
 }
 
-function blockGuest(req: Request, res: Response): boolean {
-  if (req.user?.role === "guest") {
-    res.status(403).json({ error: "Export is not available in guest sessions" });
-    return true;
-  }
-  return false;
-}
-
 // GET /api/analytics — structured analytics data for charts
 router.get("/analytics", async (req: Request, res: Response, next: NextFunction) => {
-  if (blockGuest(req, res)) return;
   try {
     const data = await buildAnalytics(userId(req));
     res.json({ data });
@@ -29,7 +20,6 @@ router.get("/analytics", async (req: Request, res: Response, next: NextFunction)
 
 // GET /api/export/excel
 router.get("/export/excel", async (req: Request, res: Response, next: NextFunction) => {
-  if (blockGuest(req, res)) return;
   try {
     await generateExcel(res, userId(req));
   } catch (e) { next(e); }
@@ -37,7 +27,6 @@ router.get("/export/excel", async (req: Request, res: Response, next: NextFuncti
 
 // GET /api/export/pdf
 router.get("/export/pdf", async (req: Request, res: Response, next: NextFunction) => {
-  if (blockGuest(req, res)) return;
   try {
     await generatePDF(res, userId(req));
   } catch (e) { next(e); }
@@ -45,7 +34,6 @@ router.get("/export/pdf", async (req: Request, res: Response, next: NextFunction
 
 // GET /api/export/excel/master — full DB dump
 router.get("/export/excel/master", async (req: Request, res: Response, next: NextFunction) => {
-  if (blockGuest(req, res)) return;
   try {
     await generateMasterExcel(res, userId(req));
   } catch (e) { next(e); }
@@ -53,7 +41,6 @@ router.get("/export/excel/master", async (req: Request, res: Response, next: Nex
 
 // POST /api/export/email — trigger monthly report email manually
 router.post("/export/email", async (req: Request, res: Response, next: NextFunction) => {
-  if (blockGuest(req, res)) return;
   try {
     await sendMonthlyReport();
     res.json({ success: true, message: "Monthly report email sent" });

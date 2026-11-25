@@ -20,8 +20,6 @@ function buildWhere(q: Record<string, string>, userId: string | null) {
 // GET /api/audit — paginated list with filters
 router.get("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    if (req.user?.role === "guest") { res.json({ data: [], total: 0, page: 1, limit: 50, pages: 0 }); return; }
-
     const q     = req.query as Record<string, string>;
     const page  = Math.max(1, parseInt(q.page  || "1",  10));
     const limit = Math.min(200, Math.max(1, parseInt(q.limit || "50", 10)));
@@ -44,7 +42,6 @@ router.get("/", async (req: Request, res: Response, next: NextFunction) => {
 // GET /api/audit/export — download as Excel
 router.get("/export", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    if (req.user?.role === "guest") { res.status(403).json({ error: "Guests cannot export audit logs" }); return; }
     const where = buildWhere(req.query as Record<string, string>, req.user?.userId ?? null);
 
     const logs = await prisma.auditLog.findMany({
